@@ -15,6 +15,7 @@ import JoinTrip from "./pages/JoinTrip";
 
 import AuthProvider from "./providers/AuthProvider";
 import PrivateRoute from "./components/PrivateRoute";
+import EnterInviteCode from "./pages/EnterInviteCode";
 
 function App() {
   const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ function App() {
               component={MemberDetail}
             />
             <PrivateRoute exact path="/profile" component={Profile} />
+            <PrivateRoute exact path="/join" component={EnterInviteCode} />
 
             {/* Catch-all */}
             <Redirect to="/" />

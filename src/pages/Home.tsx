@@ -1,5 +1,5 @@
 import { useHistory } from "react-router-dom";
-import { Users, Plus, Receipt, User, TrendingUp } from "lucide-react";
+import { Users, Plus, Receipt, User, TrendingUp, Hash } from "lucide-react";
 
 import { useQuery } from "@tanstack/react-query";
 import useApi from "@/hooks/useApi";
@@ -237,6 +237,13 @@ const Home = () => {
           <button className="flex flex-col items-center gap-1 text-blue-600">
             <Receipt size={24} />
             <span className="text-xs font-medium">Trips</span>
+          </button>
+          <button
+            onClick={() => history.push("/join")}
+            className="flex flex-col items-center gap-1 text-gray-400 active:text-gray-600"
+          >
+            <Hash size={24} />
+            <span className="text-xs">Join</span>
           </button>
           <button
             onClick={() => history.push("/profile")}
