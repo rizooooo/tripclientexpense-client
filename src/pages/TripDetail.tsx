@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { useHistory, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Receipt, Share2, Users } from "lucide-react";
+import { ArrowLeft, Plus, Receipt, Share2, MoreVertical, Trash2, X, Copy, Check, Users as UsersIcon } from "lucide-react";
 import useApi from "@/hooks/useApi";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDateRange, formatSmartDate } from "@/utils/date";
 import toast from "react-hot-toast";
+import copy from "copy-to-clipboard";
 
 // Skeleton Components
 const HeaderSkeleton = () => (
@@ -79,8 +80,16 @@ const LoadingSkeleton = () => (
 
 const TripDetail = () => {
   const history = useHistory();
+  const queryClient = useQueryClient();
   const { trip: tripApi, expense } = useApi();
   const { tripId } = useParams<{ tripId: string }>();
+
+  const [activeTab, setActiveTab] = useState("expenses");
+  const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteLink, setInviteLink] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const queryTripDetail = useQuery({
     queryKey: [`getTripDetail`, { tripId }],
@@ -105,16 +114,17 @@ const TripDetail = () => {
     enabled: !!tripId,
   });
 
-  const [activeTab, setActiveTab] = useState("expenses");
-
   const trip = queryTripDetail?.data;
   const expenses = queryExpenses?.data || [];
 
   const mutationShare = useMutation({
     onSuccess: (response) => {
-      navigator.clipboard.writeText(response?.inviteLink!).then(() => {
-        toast.success("Link copied to clipboard!");
-      });
+      setInviteLink(response?.inviteLink || "");
+      setShowInviteModal(true);
+      setShowMenu(false);
+    },
+    onError: () => {
+      toast.error("Failed to generate invite link");
     },
     mutationFn: async () => {
       const response = await tripApi.apiTripsIdInvitePost({
@@ -126,8 +136,38 @@ const TripDetail = () => {
     },
   });
 
+  const mutationDelete = useMutation({
+    onSuccess: () => {
+      toast.success("Trip deleted successfully");
+      queryClient.invalidateQueries(["getTrips"]);
+      history.replace("/");
+    },
+    onError: () => {
+      toast.error("Failed to delete trip");
+    },
+    mutationFn: async () => {
+      await tripApi.apiTripsIdDelete({ id: +tripId });
+    },
+  });
+
   const handleShare = () => {
     mutationShare.mutate();
+  };
+
+  const handleCopyLink = () => {
+    copy(inviteLink);
+    setCopied(true);
+    toast.success("Link copied to clipboard!");
+    
+    // Reset copied state after 2 seconds
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  };
+
+  const handleDeleteConfirm = () => {
+    mutationDelete.mutate();
+    setShowDeleteModal(false);
   };
 
   // Show skeleton while loading
@@ -159,12 +199,54 @@ const TripDetail = () => {
               {formatDateRange(trip?.startDate, trip?.endDate)}
             </p>
           </div>
-          <button
-            onClick={handleShare}
-            className="p-2 active:bg-white/20 rounded-lg"
-          >
-            <Share2 size={20} />
-          </button>
+
+          {/* Menu Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-2 active:bg-white/20 rounded-lg transition"
+            >
+              <MoreVertical size={20} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showMenu && (
+              <>
+                {/* Backdrop to close menu */}
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setShowMenu(false)}
+                />
+
+                {/* Menu Items */}
+                <div className="absolute right-0 top-12 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[200px] z-40 animate-fade-in">
+                  <button
+                    onClick={handleShare}
+                    disabled={mutationShare.isLoading}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 active:bg-gray-100 transition flex items-center gap-3 disabled:opacity-50"
+                  >
+                    <Share2 size={18} className="text-gray-600" />
+                    <span className="text-gray-800 font-medium">
+                      {mutationShare.isLoading ? "Generating..." : "Share Trip"}
+                    </span>
+                  </button>
+
+                  <div className="border-t border-gray-100 my-1" />
+
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowDeleteModal(true);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-red-50 active:bg-red-100 transition flex items-center gap-3"
+                  >
+                    <Trash2 size={18} className="text-red-600" />
+                    <span className="text-red-600 font-medium">Delete Trip</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Trip Summary Cards */}
@@ -227,7 +309,7 @@ const TripDetail = () => {
       </div>
 
       {/* Expenses List */}
-      <div className="px-4 mt-4 space-y-3">
+      <div className="px-4 mt-4 space-y-3 pb-4">
         {expenses.length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center shadow-sm border border-gray-200">
             <Receipt className="mx-auto text-gray-300 mb-3" size={48} />
@@ -287,6 +369,182 @@ const TripDetail = () => {
           ))
         )}
       </div>
+
+      {/* Invite Modal */}
+      {showInviteModal && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 animate-fade-in"
+            onClick={() => {
+              setShowInviteModal(false);
+              setCopied(false);
+            }}
+          />
+
+          {/* Modal */}
+          <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up">
+            <div className="bg-white w-full max-w-md mx-auto rounded-t-3xl p-6 shadow-2xl">
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  setShowInviteModal(false);
+                  setCopied(false);
+                }}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 active:text-gray-800"
+              >
+                <X size={24} />
+              </button>
+
+              {/* Icon */}
+              <div className="flex justify-center mb-4">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                  <UsersIcon className="text-blue-600" size={32} />
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              <h3 className="text-xl font-bold text-gray-800 text-center mb-2">
+                Invite to Trip
+              </h3>
+              <p className="text-gray-600 text-center text-sm mb-6">
+                Share this link with people you want to invite to{" "}
+                <span className="font-semibold">"{trip?.name}"</span>
+              </p>
+
+              {/* Link Display Box */}
+              <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-4">
+                <p className="text-xs text-gray-500 mb-2 font-medium">Invite Link</p>
+                <p className="text-sm text-gray-800 break-all font-mono leading-relaxed">
+                  {inviteLink}
+                </p>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+                <p className="text-blue-800 text-xs text-center">
+                  ⏰ This link expires in 30 days
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <button
+                  onClick={handleCopyLink}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 active:bg-blue-800 transition flex items-center justify-center gap-2"
+                >
+                  {copied ? (
+                    <>
+                      <Check size={20} />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={20} />
+                      Copy Link
+                    </>
+                  )}
+                </button>
+
+                {/* Native Share (if available) */}
+                {navigator.share && (
+                  <button
+                    onClick={() => {
+                      navigator.share({
+                        title: `Join ${trip?.name}`,
+                        text: `You're invited to join "${trip?.name}" on TripSplit!`,
+                        url: inviteLink,
+                      }).catch(() => {
+                        // User cancelled share
+                      });
+                    }}
+                    className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-200 active:bg-gray-300 transition flex items-center justify-center gap-2"
+                  >
+                    <Share2 size={20} />
+                    Share via...
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <>
+          {/* Backdrop */}
+          <div className="fixed inset-0 bg-black/50 z-40 animate-fade-in" />
+
+          {/* Modal */}
+          <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up">
+            <div className="bg-white w-full max-w-md mx-auto rounded-t-3xl p-6 shadow-2xl">
+              {/* Close Button */}
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 active:text-gray-800"
+              >
+                <X size={24} />
+              </button>
+
+              {/* Warning Icon */}
+              <div className="flex justify-center mb-4">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                  <Trash2 className="text-red-600" size={32} />
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              <h3 className="text-xl font-bold text-gray-800 text-center mb-2">
+                Delete Trip?
+              </h3>
+              <p className="text-gray-600 text-center text-sm mb-4">
+                Are you sure you want to delete{" "}
+                <span className="font-semibold">"{trip?.name}"</span>?
+              </p>
+              <p className="text-gray-600 text-center text-sm mb-6">
+                This will permanently delete all expenses and balances. This
+                action cannot be undone.
+              </p>
+
+              {/* Warning Box */}
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
+                <p className="text-red-800 text-xs text-center font-medium">
+                  ⚠️ All members will lose access to this trip
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={mutationDelete.isLoading}
+                  className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-200 active:bg-gray-300 transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  disabled={mutationDelete.isLoading}
+                  className="flex-1 bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 active:bg-red-800 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {mutationDelete.isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={18} />
+                      Delete Trip
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
