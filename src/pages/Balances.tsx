@@ -101,9 +101,11 @@ const Balances = () => {
           queryBalance?.data?.map((member) => (
             <div
               key={member.userId}
-              onClick={() =>
-                history.push(`/trips/${tripId}/members/${member.userId}`)
-              }
+              onClick={() => {
+                if (currentAuth?.userId !== member?.userId) {
+                  history.push(`/trips/${tripId}/members/${member.userId}`);
+                }
+              }}
               className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex items-center justify-between active:bg-gray-50 transition"
             >
               <div className="flex items-center gap-3">
@@ -138,7 +140,10 @@ const Balances = () => {
                 >
                   {member.balance > 0 ? "+" : ""}₱{Math.abs(member.balance)}
                 </p>
-                <span className="text-gray-400">›</span>
+
+                {currentAuth?.userId !== member?.userId && (
+                  <span className="text-gray-400">›</span>
+                )}
               </div>
             </div>
           ))

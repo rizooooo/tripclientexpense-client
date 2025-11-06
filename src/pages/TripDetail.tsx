@@ -1,11 +1,23 @@
 import React, { useState } from "react";
 import { useHistory, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Receipt, Share2, MoreVertical, Trash2, X, Copy, Check, Users as UsersIcon } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Receipt,
+  Share2,
+  MoreVertical,
+  Trash2,
+  X,
+  Copy,
+  Check,
+  Users as UsersIcon,
+} from "lucide-react";
 import useApi from "@/hooks/useApi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDateRange, formatSmartDate } from "@/utils/date";
+import { formatDateRange, formatRelativeDate, formatSmartDate } from "@/utils/date";
 import toast from "react-hot-toast";
 import copy from "copy-to-clipboard";
+import { useAuth } from "@/context/AuthContext";
 
 // Skeleton Components
 const HeaderSkeleton = () => (
@@ -90,13 +102,13 @@ const TripDetail = () => {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
   const [copied, setCopied] = useState(false);
+  const { currentAuth } = useAuth();
 
   const queryTripDetail = useQuery({
     queryKey: [`getTripDetail`, { tripId }],
     queryFn: async () => {
       const response = await tripApi.apiTripsIdDetailsGet({
         id: +tripId,
-        userId: 5,
       });
 
       return response;
@@ -158,7 +170,7 @@ const TripDetail = () => {
     copy(inviteLink);
     setCopied(true);
     toast.success("Link copied to clipboard!");
-    
+
     // Reset copied state after 2 seconds
     setTimeout(() => {
       setCopied(false);
@@ -172,8 +184,8 @@ const TripDetail = () => {
 
   // Show skeleton while loading
   if (
-    queryTripDetail?.isLoading ||
-    queryExpenses?.isLoading ||
+    queryTripDetail?.isPending ||
+    queryExpenses?.isPending ||
     queryExpenses?.isFetching ||
     queryExpenses?.isRefetching ||
     queryTripDetail?.isFetching ||
@@ -222,12 +234,12 @@ const TripDetail = () => {
                 <div className="absolute right-0 top-12 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[200px] z-40 animate-fade-in">
                   <button
                     onClick={handleShare}
-                    disabled={mutationShare.isLoading}
+                    disabled={mutationShare.isPending}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 active:bg-gray-100 transition flex items-center gap-3 disabled:opacity-50"
                   >
                     <Share2 size={18} className="text-gray-600" />
                     <span className="text-gray-800 font-medium">
-                      {mutationShare.isLoading ? "Generating..." : "Share Trip"}
+                      {mutationShare.isPending ? "Generating..." : "Share Trip"}
                     </span>
                   </button>
 
@@ -241,7 +253,9 @@ const TripDetail = () => {
                     className="w-full px-4 py-3 text-left hover:bg-red-50 active:bg-red-100 transition flex items-center gap-3"
                   >
                     <Trash2 size={18} className="text-red-600" />
-                    <span className="text-red-600 font-medium">Delete Trip</span>
+                    <span className="text-red-600 font-medium">
+                      Delete Trip
+                    </span>
                   </button>
                 </div>
               </>
@@ -291,22 +305,24 @@ const TripDetail = () => {
       </div>
 
       {/* Add Expense Button */}
-      <div className="px-4 mt-4">
-        <button
-          onClick={() =>
-            history.push({
-              pathname: `/trips/${tripId}/expenses/add`,
-              state: {
-                members: queryTripDetail?.data?.members,
-              },
-            })
-          }
-          className="w-full bg-blue-600 text-white py-3 rounded-lg flex items-center justify-center gap-2 font-medium hover:bg-blue-700 active:bg-blue-800 transition"
-        >
-          <Plus size={20} />
-          Add Expense
-        </button>
-      </div>
+      {expenses.length > 0 && (
+        <div className="px-4 mt-4">
+          <button
+            onClick={() =>
+              history.push({
+                pathname: `/trips/${tripId}/expenses/add`,
+                state: {
+                  members: queryTripDetail?.data?.members,
+                },
+              })
+            }
+            className="w-full bg-blue-600 text-white py-3 rounded-lg flex items-center justify-center gap-2 font-medium hover:bg-blue-700 active:bg-blue-800 transition"
+          >
+            <Plus size={20} />
+            Add Expense
+          </button>
+        </div>
+      )}
 
       {/* Expenses List */}
       <div className="px-4 mt-4 space-y-3 pb-4">
@@ -315,7 +331,14 @@ const TripDetail = () => {
             <Receipt className="mx-auto text-gray-300 mb-3" size={48} />
             <p className="text-gray-500 mb-4">No expenses yet</p>
             <button
-              onClick={() => history.push(`/trips/${tripId}/expenses/add`)}
+              onClick={() =>
+                history.push({
+                  pathname: `/trips/${tripId}/expenses/add`,
+                  state: {
+                    members: queryTripDetail?.data?.members,
+                  },
+                })
+              }
               className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium"
             >
               Add First Expense
@@ -326,14 +349,16 @@ const TripDetail = () => {
           expenses?.map((expense) => (
             <div
               key={expense.id}
-              onClick={() =>
-                history.push({
-                  pathname: `/trips/${tripId}/expenses/${expense.id}/edit`,
-                  state: {
-                    members: queryTripDetail?.data?.members,
-                  },
-                })
-              }
+              onClick={() => {
+                if (expense?.paidByUserId === currentAuth?.userId) {
+                  history.push({
+                    pathname: `/trips/${tripId}/expenses/${expense.id}/edit`,
+                    state: {
+                      members: queryTripDetail?.data?.members,
+                    },
+                  });
+                }
+              }}
               className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 active:bg-gray-50 transition"
             >
               <div className="flex items-start justify-between mb-2">
@@ -346,7 +371,7 @@ const TripDetail = () => {
                       {expense?.description}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      {formatSmartDate(expense?.expenseDate)}
+                      {formatRelativeDate(expense?.createdAt)}
                     </p>
                   </div>
                 </div>
@@ -374,7 +399,7 @@ const TripDetail = () => {
       {showInviteModal && (
         <>
           {/* Backdrop */}
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 z-40 animate-fade-in"
             onClick={() => {
               setShowInviteModal(false);
@@ -405,33 +430,85 @@ const TripDetail = () => {
 
               {/* Title & Description */}
               <h3 className="text-xl font-bold text-gray-800 text-center mb-2">
-                Invite to Trip
+                Invite Friends
               </h3>
               <p className="text-gray-600 text-center text-sm mb-6">
-                Share this link with people you want to invite to{" "}
+                Share this code to invite people to{" "}
                 <span className="font-semibold">"{trip?.name}"</span>
               </p>
 
-              {/* Link Display Box */}
-              <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-4">
-                <p className="text-xs text-gray-500 mb-2 font-medium">Invite Link</p>
-                <p className="text-sm text-gray-800 break-all font-mono leading-relaxed">
-                  {inviteLink}
-                </p>
+              {/* HUGE Code Display */}
+              <div className="relative mb-6">
+                {/* Decorative Background */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 rounded-3xl blur-sm"></div>
+
+                {/* Code Container */}
+                <div className="relative bg-white rounded-3xl p-8 shadow-lg border-2 border-blue-200">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 uppercase tracking-widest mb-3 font-semibold">
+                      Your Invite Code
+                    </p>
+                    {/* The Code - MASSIVE */}
+                    <div
+                      onClick={() => {
+                        const token = mutationShare.data?.inviteToken;
+                        if (token) {
+                          copy(token);
+                          setCopied(true);
+                          toast.success("Code copied!");
+                          setTimeout(() => setCopied(false), 2000);
+                        }
+                      }}
+                      className="cursor-pointer active:scale-95 transition-transform"
+                    >
+                      <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 tracking-[0.5em] font-mono select-all">
+                        {mutationShare.data?.inviteToken || "----"}
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-4">
+                      Tap to copy • Valid for 30 days
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              {/* Info Box */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-                <p className="text-blue-800 text-xs text-center">
-                  ⏰ This link expires in 30 days
-                </p>
+              {/* How to use */}
+              <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-blue-600 font-bold text-sm">1</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-700">
+                      Share the code via text, chat, or email
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 mt-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-blue-600 font-bold text-sm">2</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-700">
+                      They enter it in the app under "Join Trip"
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Action Buttons */}
               <div className="space-y-3">
                 <button
-                  onClick={handleCopyLink}
-                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 active:bg-blue-800 transition flex items-center justify-center gap-2"
+                  onClick={() => {
+                    const token = mutationShare.data?.inviteToken;
+                    if (token) {
+                      copy(token);
+                      setCopied(true);
+                      toast.success("Code copied to clipboard!");
+                      setTimeout(() => setCopied(false), 2000);
+                    }
+                  }}
+                  className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-semibold hover:bg-blue-700 active:bg-blue-800 transition flex items-center justify-center gap-2 shadow-lg shadow-blue-200"
                 >
                   {copied ? (
                     <>
@@ -441,7 +518,7 @@ const TripDetail = () => {
                   ) : (
                     <>
                       <Copy size={20} />
-                      Copy Link
+                      Copy Code
                     </>
                   )}
                 </button>
@@ -450,18 +527,20 @@ const TripDetail = () => {
                 {navigator.share && (
                   <button
                     onClick={() => {
-                      navigator.share({
-                        title: `Join ${trip?.name}`,
-                        text: `You're invited to join "${trip?.name}" on TripSplit!`,
-                        url: inviteLink,
-                      }).catch(() => {
-                        // User cancelled share
-                      });
+                      const token = mutationShare.data?.inviteToken;
+                      navigator
+                        .share({
+                          title: `Join ${trip?.name}`,
+                          text: `You're invited to "${trip?.name}"!\n\nJoin using code: ${token}\n\nOr use this link: ${inviteLink}`,
+                        })
+                        .catch(() => {
+                          // User cancelled share
+                        });
                     }}
-                    className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-200 active:bg-gray-300 transition flex items-center justify-center gap-2"
+                    className="w-full bg-gray-100 text-gray-700 py-3.5 rounded-xl font-semibold hover:bg-gray-200 active:bg-gray-300 transition flex items-center justify-center gap-2"
                   >
                     <Share2 size={20} />
-                    Share via...
+                    Share Code
                   </button>
                 )}
               </div>
@@ -518,17 +597,17 @@ const TripDetail = () => {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowDeleteModal(false)}
-                  disabled={mutationDelete.isLoading}
+                  disabled={mutationDelete.isPending}
                   className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-200 active:bg-gray-300 transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
-                  disabled={mutationDelete.isLoading}
+                  disabled={mutationDelete.isPending}
                   className="flex-1 bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 active:bg-red-800 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {mutationDelete.isLoading ? (
+                  {mutationDelete.isPending ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       Deleting...

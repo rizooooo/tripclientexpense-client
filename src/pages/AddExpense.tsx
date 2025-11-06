@@ -43,7 +43,6 @@ const AddExpense = () => {
     description: "",
     amount: "",
     paidBy: "",
-    date: new Date().toISOString().split("T")[0],
   });
 
   const [selectedMembers, setSelectedMembers] = useState(
@@ -87,10 +86,11 @@ const AddExpense = () => {
           ...params,
         },
       });
-    },onSuccess: () => {
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries([`getTripDetail`]);
       queryClient.invalidateQueries([`getTripExpenses`]);
-    }
+    },
   });
 
   const deleteMutation = useMutation({
@@ -101,7 +101,7 @@ const AddExpense = () => {
     },
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Validation
     if (
       !expenseData.description ||
@@ -127,10 +127,9 @@ const AddExpense = () => {
     }
     const isSplitEqual = splitType === "Equal";
 
-    mutation.mutate({
+    await mutation.mutateAsync({
       amount: +expenseData?.amount,
       description: expenseData?.description,
-      expenseDate: new Date(expenseData?.date),
       paidByUserId: +expenseData?.paidBy, // todo should be handled BE,
       splitType,
       tripId: +tripId,
@@ -156,9 +155,6 @@ const AddExpense = () => {
     if (isEditMode && queryGetExpense?.isSuccess && queryGetExpense?.data) {
       setExpenseData({
         amount: queryGetExpense?.data?.amount,
-        date: new Date(queryGetExpense?.data?.expenseDate)
-          .toISOString()
-          .split("T")[0],
         description: queryGetExpense?.data?.description,
         paidBy: queryGetExpense?.data?.paidByUserId,
       });
@@ -235,20 +231,6 @@ const AddExpense = () => {
                 </option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date
-            </label>
-            <input
-              type="date"
-              value={expenseData.date}
-              onChange={(e) =>
-                setExpenseData({ ...expenseData, date: e.target.value })
-              }
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
           </div>
         </div>
 
@@ -359,6 +341,24 @@ const AddExpense = () => {
                   <span className="text-sm font-medium text-gray-700">
                     Total Split Amount
                   </span>
+
+                  <span
+                    className={`text-lg font-bold ${
+                      Math.abs(
+                        calculateTotal() - parseFloat(expenseData.amount || 0)
+                      ) < 0.01
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    ₱{calculateTotal().toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Total Remaining Amount
+                  </span>
+
                   <span
                     className={`text-lg font-bold ${
                       Math.abs(

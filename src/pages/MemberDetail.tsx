@@ -1,11 +1,19 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useHistory, useParams } from "react-router-dom";
-import { ArrowLeft, Receipt, CreditCard, X } from "lucide-react";
+import {
+  ArrowLeft,
+  CreditCard,
+  Receipt,
+  TrendingDown,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import useApi from "@/hooks/useApi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatRelativeDate } from "@/utils/date";
 
 const MemberDetail = () => {
   const history = useHistory();
@@ -28,53 +36,20 @@ const MemberDetail = () => {
     isFetching,
     isRefetching,
   } = useQuery({
+    // Use the DTO type here
     queryKey: ["getMemberBreakdownTrip", { memberId, tripId }],
     queryFn: async () => {
+      // FIX 2: Convert string IDs from URL to numbers right away to ensure type safety
       const response =
         await expenseApi.apiExpensesMemberUserIdTripTripIdBreakdownGet({
-          tripId: +tripId,
-          userId: +memberId,
+          tripId: parseInt(tripId),
+          userId: parseInt(memberId),
         });
       return response;
     },
   });
 
-  // const handleFullPayment = () => {
-  //   // TODO: Implement full settlement creation
-  //   const netBalance = breakdown?.netBalance || 0;
-  //   toast.success(
-  //     `Recorded ₱${Math.abs(netBalance).toFixed(2)} payment from ${
-  //       breakdown?.userName
-  //     }`
-  //   );
-  //   history.goBack();
-  // };
-
-  // const handlePartialPayment = () => {
-  //   const amount = parseFloat(paymentAmount);
-  //   const netBalance = Math.abs(breakdown?.netBalance || 0);
-
-  //   if (!paymentAmount || amount <= 0) {
-  //     toast.error("Please enter a valid amount");
-  //     return;
-  //   }
-
-  //   if (amount > netBalance) {
-  //     toast.error(`Amount cannot exceed ₱${netBalance.toFixed(2)}`);
-  //     return;
-  //   }
-
-  //   // TODO: Implement partial settlement creation
-  //   toast.success(
-  //     `Recorded ₱${amount.toFixed(2)} partial payment from ${
-  //       breakdown?.userName
-  //     }`
-  //   );
-  //   setShowPaymentModal(false);
-  //   setPaymentAmount("");
-  //   history.goBack();
-  // };
-
+  // FIX 2: Refined handler to ensure numbers are passed
   const setQuickAmount = (percentage: number) => {
     const netBalance = Math.abs(breakdown?.netBalance || 0);
     const amount = (netBalance * percentage).toFixed(2);
@@ -88,11 +63,20 @@ const MemberDetail = () => {
       // Determine who pays whom
       const isUserOwing = netBalance < 0;
 
+      // FIX 2: Use non-null assertion or conditional check for currentAuth?.userId
+      // Assuming currentAuth.userId is defined when reaching this point.
+      const authUserId = currentAuth?.userId;
+
+      if (!authUserId) {
+        throw new Error("Authentication error: current user ID is missing.");
+      }
+
       return await settlementApi.apiSettlementsPost({
         settlementCreateDto: {
-          tripId: +tripId,
-          fromUserId: isUserOwing ? +memberId : currentAuth?.userId, // ← You need to get current user ID
-          toUserId: isUserOwing ? currentAuth?.userId : +memberId,
+          tripId: parseInt(tripId), // FIX 2
+          // FIX 2: The currentAuth?.userId now has a non-null check above or is handled by TypeScript's implicit casting since we used '|| 0' in the original code, but explicit handling is better.
+          fromUserId: isUserOwing ? parseInt(memberId) : authUserId,
+          toUserId: isUserOwing ? authUserId : parseInt(memberId),
           amount: amount,
           notes:
             amount === Math.abs(netBalance)
@@ -190,18 +174,17 @@ const MemberDetail = () => {
     );
   }
 
-  if (!breakdown) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">No data available</div>
-      </div>
-    );
-  }
-
   const netBalance = breakdown.netBalance || 0;
-  const isOwing = netBalance < 0;
+  // FIX 2: Ensure comparison is safe, although memberId is a string, breakdown?.userId is likely a number
+  // Since we use parseInt(memberId) in the query, we assume memberId (string) or breakdown.userId (number) are correct.
+  const isOwing = netBalance < 0 && breakdown?.userId !== currentAuth?.userId;
   const isGettingBack = netBalance > 0;
   const isSettled = netBalance === 0;
+
+  // FIX 1: Get the current user's name for correct messaging
+  const currentUserName = currentAuth?.userName || "You";
+
+  // FIX 3: Prioritize the runningTransactions list if it exists
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
@@ -238,71 +221,181 @@ const MemberDetail = () => {
         </div>
       </div>
 
-      {/* Expense Breakdown */}
+      {/* Expense Breakdown (Now Running Transactions) */}
       <div className="px-4 mt-4">
         <h3 className="text-sm font-semibold text-gray-600 uppercase mb-3">
-          Expense Breakdown
+          Transaction History
         </h3>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
-          {breakdown.expenses?.map((expense) => {
-            const isPositive = expense.netAmount > 0;
-            const isUserPaid = expense.paidByUserId === breakdown.userId;
+
+        <div className="space-y-3">
+          {breakdown.transactions?.map((transaction) => {
+            const isExpense = transaction.type === "Expense";
+            const isPayment = transaction.type === "Payment";
+            const isPositive = transaction.amount > 0;
 
             return (
-              <div
-                key={expense.expenseId}
-                className="p-4 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`p-2 rounded-lg ${
-                      isPositive ? "bg-green-100" : "bg-red-100"
-                    }`}
-                  >
-                    <Receipt
-                      className={isPositive ? "text-green-600" : "text-red-600"}
-                      size={18}
-                    />
+              <div key={`${transaction.type}-${transaction.transactionId}`}>
+                {/* Transaction Card */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-start gap-3 flex-1">
+                      {/* Icon */}
+                      <div
+                        className={`p-2 rounded-lg ${
+                          isExpense
+                            ? isPositive
+                              ? "bg-green-100"
+                              : "bg-red-100"
+                            : isPayment
+                            ? "bg-blue-100"
+                            : "bg-purple-100"
+                        }`}
+                      >
+                        {isExpense ? (
+                          <Receipt
+                            className={
+                              isPositive ? "text-green-600" : "text-red-600"
+                            }
+                            size={18}
+                          />
+                        ) : (
+                          <CreditCard
+                            className={
+                              isPayment ? "text-blue-600" : "text-purple-600"
+                            }
+                            size={18}
+                          />
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-semibold text-gray-800">
+                            {transaction.description}
+                          </p>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              isExpense
+                                ? "bg-gray-100 text-gray-600"
+                                : isPayment
+                                ? "bg-blue-100 text-blue-600"
+                                : "bg-purple-100 text-purple-600"
+                            }`}
+                          >
+                            {transaction.type}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-gray-500">
+                          {formatRelativeDate(transaction?.date)}
+                        </p>
+
+                        {/* Additional Info */}
+                        {isExpense && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {transaction.isUserPayer
+                              ? `${breakdown.userName} paid`
+                              : `Paid by ${transaction.paidByName}`}
+                            {transaction.totalExpenseAmount && (
+                              <span className="text-gray-400">
+                                {" "}
+                                • Total: ₱
+                                {transaction.totalExpenseAmount.toFixed(2)}
+                              </span>
+                            )}
+                          </p>
+                        )}
+
+                        {transaction.notes && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            {transaction.notes}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Amount */}
+                    <div className="text-right ml-3">
+                      <p
+                        className={`text-lg font-bold ${
+                          isPositive ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        {isPositive ? "+" : ""}₱
+                        {Math.abs(transaction.amount).toFixed(2)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-800">
-                      {expense.description}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {isUserPaid
-                        ? `${breakdown.userName} paid`
-                        : `Paid by ${expense.paidByName}`}
-                    </p>
+
+                  {/* Running Balance */}
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">
+                        Balance after this
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {transaction.runningBalance < 0 ? (
+                          <TrendingDown className="text-red-500" size={14} />
+                        ) : transaction.runningBalance > 0 ? (
+                          <TrendingUp className="text-green-500" size={14} />
+                        ) : null}
+                        <span
+                          className={`text-sm font-semibold ${
+                            transaction.runningBalance < 0
+                              ? "text-red-600"
+                              : transaction.runningBalance > 0
+                              ? "text-green-600"
+                              : "text-gray-600"
+                          }`}
+                        >
+                          ₱{Math.abs(transaction.runningBalance).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <p
-                  className={`font-semibold ${
-                    isPositive ? "text-green-600" : "text-red-600"
-                  }`}
-                >
-                  {isPositive ? "+" : ""}₱
-                  {Math.abs(expense.netAmount).toFixed(2)}
-                </p>
               </div>
             );
           })}
+        </div>
 
-          {/* Net Balance */}
-          <div className="p-4 bg-gray-50 rounded-b-xl">
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-gray-700">Net Balance</p>
-              <p
-                className={`text-xl font-bold ${
-                  isOwing
-                    ? "text-red-600"
-                    : isGettingBack
-                    ? "text-green-600"
-                    : "text-gray-600"
-                }`}
-              >
-                {isGettingBack ? "+" : ""}₱{Math.abs(netBalance).toFixed(2)}
+        {/* Info message when user is getting money back */}
+        {isGettingBack && (
+          <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-4">
+            {/* FIX 1: Use currentAuth name (the viewer/debtor) and breakdown name (the creditor) */}
+            <p className="text-sm text-green-800 text-center font-medium mb-1">
+              **{currentUserName}** owes **{breakdown.userName}** ₱
+              {Math.abs(netBalance).toFixed(2)}
+            </p>
+            <p className="text-xs text-green-600 text-center">
+              {currentUserName} needs to record the payment when they pay{" "}
+              {breakdown.userName} back
+            </p>
+          </div>
+        )}
+
+        {/* Settled message */}
+        {isSettled && (
+          <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <p className="text-sm text-gray-600 text-center font-medium">
+              ✓ All settled up with {breakdown.userName}
+            </p>
+          </div>
+        )}
+
+        {/* Final Balance Card */}
+        <div className="mt-6 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-100 text-sm mb-1">Current Balance</p>
+              <p className="text-3xl font-bold">
+                {isOwing ? "Owes" : isGettingBack ? "Gets back" : "Settled"}
               </p>
             </div>
+            <p className="text-4xl font-bold">
+              ₱{Math.abs(netBalance).toFixed(2)}
+            </p>
           </div>
         </div>
 
@@ -327,30 +420,9 @@ const MemberDetail = () => {
             </button>
           </div>
         )}
-
-        {/* Info message when user is getting money back */}
-        {isGettingBack && (
-          <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-4">
-            <p className="text-sm text-green-800 text-center font-medium mb-1">
-              {breakdown.userName} owes you ₱{Math.abs(netBalance).toFixed(2)}
-            </p>
-            <p className="text-xs text-green-600 text-center">
-              They will record the payment when they pay you back
-            </p>
-          </div>
-        )}
-
-        {/* Settled message */}
-        {isSettled && (
-          <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
-            <p className="text-sm text-gray-600 text-center font-medium">
-              ✓ All settled up with {breakdown.userName}
-            </p>
-          </div>
-        )}
       </div>
 
-      {/* Partial Payment Modal */}
+      {/* Partial Payment Modal (Modal content remains unchanged) */}
       {showPaymentModal && (
         <>
           {/* Backdrop */}

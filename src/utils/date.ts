@@ -3,13 +3,15 @@ import {
   differenceInHours,
   differenceInMinutes,
   format,
+  formatRelative,
   isSameMonth,
   isSameYear,
   isThisYear,
   isToday,
   isYesterday,
+  parseISO,
 } from "date-fns";
-
+import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 /**
  * Formats two Date objects into a human-readable range.
  * Examples:
@@ -50,38 +52,82 @@ export function formatDateRange(startDate?: Date, endDate?: Date): string {
  * - "Oct 20, 2024, 3:45 PM" if it's from another year
  */
 
+// Add the necessary import from 'date-fns-tz'
+
+// ... (Keep the other date-fns imports) ...
+
+export const formatRelativeDate = (
+  createdAt: string | Date | null | undefined
+) => {
+  if (!createdAt) {
+    return null;
+  }
+  return formatRelative(
+    typeof createdAt === "string" ? parseISO(createdAt) : createdAt,
+    new Date()
+  );
+};
+
 export function formatSmartDate(dateInput?: Date | string): string {
   if (!dateInput) return "";
 
-  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  let date: Date;
+  let targetTz: string;
+
+  // 1. Determine the correct Date object and the target timezone
+  if (typeof dateInput === "string" && !dateInput.endsWith("Z")) {
+    // Treat naive string as UTC for correct parsing
+    date = new Date(dateInput + "Z");
+  } else {
+    date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  }
+
+  // Use the local system's timezone as the conversion target for display
+  // eslint-disable-next-line prefer-const
+  targetTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
   if (isNaN(date.getTime())) return "";
 
-  const now = new Date();
-  const diffInMinutes = differenceInMinutes(now, date);
-  const diffInHours = differenceInHours(now, date);
-  const diffInDays = differenceInDays(now, date);
+  // 2. Perform all calculations and formatting using timezone-aware functions
 
+  // Get the zoned date objects for correct comparison and calculation
+  const zonedDate = toZonedTime(date, targetTz);
+  const zonedNow = toZonedTime(new Date(), targetTz); // Ensure 'now' is also zoned
+
+  const diffInMinutes = differenceInMinutes(zonedNow, zonedDate);
+  const diffInHours = differenceInHours(zonedNow, zonedDate);
+  const diffInDays = differenceInDays(zonedNow, zonedDate);
+
+  // Use the zoned date for all checks
   const isMidnight =
-    date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0;
+    zonedDate.getHours() === 0 &&
+    zonedDate.getMinutes() === 0 &&
+    zonedDate.getSeconds() === 0;
 
-  // ⏱️ Relative time for recent events
+  // Helper function for timezone-aware formatting
+  const formatZoned = (date: Date, formatStr: string) =>
+    formatInTimeZone(date, targetTz, formatStr);
+
+  // ⏱️ Relative time for recent events (Logic remains the same)
   if (diffInMinutes < 1) return "Just now";
   if (diffInMinutes < 60) {
     return `${diffInMinutes} minute${diffInMinutes > 1 ? "s" : ""} ago`;
   }
-  if (diffInHours < 6 && isToday(date)) {
+  if (diffInHours < 6 && isToday(zonedDate)) {
+    // Use isToday on zonedDate
     return `${diffInHours} hour${diffInHours > 1 ? "s" : ""} ago`;
   }
 
   // 📅 Same day
-  if (isToday(date)) {
-    // if it's exactly midnight, just show the date
-    return isMidnight ? "Today" : format(date, "h:mm a");
+  if (isToday(zonedDate)) {
+    return isMidnight ? "Today" : formatZoned(zonedDate, "h:mm a");
   }
 
   // 📅 Yesterday
-  if (isYesterday(date)) {
-    return isMidnight ? "Yesterday" : `Yesterday, ${format(date, "h:mm a")}`;
+  if (isYesterday(zonedDate)) {
+    return isMidnight
+      ? "Yesterday"
+      : `Yesterday, ${formatZoned(zonedDate, "h:mm a")}`;
   }
 
   // 📆 Within the past week
@@ -90,10 +136,13 @@ export function formatSmartDate(dateInput?: Date | string): string {
   }
 
   // 📆 This year
-  if (isThisYear(date)) {
-    return format(date, isMidnight ? "MMM d" : "MMM d, h:mm a");
+  if (isThisYear(zonedDate)) {
+    return formatZoned(zonedDate, isMidnight ? "MMM d" : "MMM d, h:mm a");
   }
 
   // 📆 Older than this year
-  return format(date, isMidnight ? "MMM d, yyyy" : "MMM d, yyyy, h:mm a");
+  return formatZoned(
+    zonedDate,
+    isMidnight ? "MMM d, yyyy" : "MMM d, yyyy, h:mm a"
+  );
 }
