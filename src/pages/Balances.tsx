@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton"; // 👈 make sure you have this component
+import { getCurrencySymbol } from "@/lib/utils";
 
 const Balances = () => {
   const history = useHistory();
@@ -19,6 +20,8 @@ const Balances = () => {
 
   const trip = tripDetail;
 
+  const curreny = getCurrencySymbol(tripDetail?.currency);
+
   const queryBalance = useQuery({
     queryKey: [`getBalanceByTrip`, { trip }],
     queryFn: async () => {
@@ -28,15 +31,6 @@ const Balances = () => {
       return response;
     },
   });
-
-  const settlements = [
-    { from: "Marc", fromId: 1, to: "Darrell", toId: 5, amount: 150 },
-    { from: "Elsie", fromId: 3, to: "Joy", toId: 2, amount: 50 },
-  ];
-
-  const handleRecordPayment = (settlement) => {
-    toast.success(`Payment recorded: ${settlement.from} → ${settlement.to}`);
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
@@ -102,9 +96,7 @@ const Balances = () => {
             <div
               key={member.userId}
               onClick={() => {
-                if (currentAuth?.userId !== member?.userId) {
-                  history.push(`/trips/${tripId}/members/${member.userId}`);
-                }
+                history.push(`/trips/${tripId}/members/${member.userId}`);
               }}
               className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex items-center justify-between active:bg-gray-50 transition"
             >
@@ -138,12 +130,12 @@ const Balances = () => {
                       : "text-gray-600"
                   }`}
                 >
-                  {member.balance > 0 ? "+" : ""}₱{Math.abs(member.balance)}
+                  {member.balance > 0 ? "+" : ""}
+                  {curreny}
+                  {Math.abs(member.balance)}
                 </p>
 
-                {currentAuth?.userId !== member?.userId && (
-                  <span className="text-gray-400">›</span>
-                )}
+                <span className="text-gray-400">›</span>
               </div>
             </div>
           ))

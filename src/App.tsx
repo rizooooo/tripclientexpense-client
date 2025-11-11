@@ -33,6 +33,7 @@ function App() {
             <PrivateRoute exact path="/" component={Home} />
             <PrivateRoute exact path="/join/:token" component={JoinTrip} />
             <PrivateRoute exact path="/trips/create" component={CreateTrip} />
+            <PrivateRoute exact path="/trips/edit/:tripId" component={CreateTrip} />
             <PrivateRoute exact path="/trips/:tripId" component={TripDetail} />
             <PrivateRoute
               exact

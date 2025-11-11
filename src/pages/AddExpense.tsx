@@ -4,8 +4,9 @@ import { ArrowLeft, ReceiptRussianRuble } from "lucide-react";
 import toast from "react-hot-toast";
 import useApi from "@/hooks/useApi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ExpenseCreateDto, TripMemberDto } from "api";
+import type { ExpenseCreateDto, TripDetailDto, TripMemberDto } from "api";
 import { useAuth } from "@/context/AuthContext";
+import { getCurrencySymbol } from "@/lib/utils";
 
 const AddExpense = () => {
   const { currentAuth } = useAuth();
@@ -20,10 +21,13 @@ const AddExpense = () => {
   }>();
 
   const {
-    state: { members },
+    state: { members, trip },
   } = useLocation<{
     members: TripMemberDto[];
+    trip: TripDetailDto;
   }>();
+
+  console.log({ trip });
 
   const isEditMode = !!expenseId;
 
@@ -161,6 +165,8 @@ const AddExpense = () => {
     }
   }, [queryGetExpense?.isSuccess, isEditMode]);
 
+  const currency = getCurrencySymbol(trip?.currency);
+
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
       {/* Header */}
@@ -198,7 +204,7 @@ const AddExpense = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Total Amount (₱) <span className="text-red-500">*</span>
+              Total Amount ({currency}) <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -294,7 +300,7 @@ const AddExpense = () => {
                       </span>
                       {isSelected && (
                         <span className="text-sm font-semibold text-gray-700">
-                          ₱{equalShare}
+                          {currency}{equalShare}
                         </span>
                       )}
                     </label>
@@ -320,7 +326,7 @@ const AddExpense = () => {
                       {member.name}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-600">₱</span>
+                      <span className="text-gray-600">{currency}</span>
                       <input
                         type="number"
                         value={customAmounts[member.userId]}
@@ -351,7 +357,7 @@ const AddExpense = () => {
                         : "text-red-600"
                     }`}
                   >
-                    ₱{calculateTotal().toFixed(2)}
+                    {currency}{calculateTotal().toFixed(2)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-2">
@@ -368,14 +374,14 @@ const AddExpense = () => {
                         : "text-red-600"
                     }`}
                   >
-                    ₱{calculateTotal().toFixed(2)}
+                    {currency}{calculateTotal().toFixed(2)}
                   </span>
                 </div>
                 {expenseData.amount &&
                   Math.abs(calculateTotal() - parseFloat(expenseData.amount)) >
                     0.01 && (
                     <p className="text-xs text-red-600 mt-2 text-center">
-                      ⚠️ Split amounts must equal ₱
+                      ⚠️ Split amounts must equal {currency}
                       {parseFloat(expenseData.amount).toFixed(2)}
                     </p>
                   )}

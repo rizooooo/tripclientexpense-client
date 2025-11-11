@@ -1,9 +1,19 @@
 import { useHistory } from "react-router-dom";
-import { Users, Plus, Receipt, User, TrendingUp, Hash } from "lucide-react";
+import {
+  Users,
+  Plus,
+  Receipt,
+  User,
+  TrendingUp,
+  Hash,
+  TrendingDown,
+  DollarSign,
+} from "lucide-react";
 
 import { useQuery } from "@tanstack/react-query";
 import useApi from "@/hooks/useApi";
 import { formatDateRange } from "@/utils/date";
+import { getCurrencySymbol } from "@/lib/utils";
 
 const Home = () => {
   const { trip } = useApi();
@@ -29,7 +39,7 @@ const Home = () => {
 
   const trips = queryTrips?.data || [];
 
-  const overallBalance = queryDashboard?.data?.overallBalance; // positive = owed to you, negative = you owe
+  const dashboard = queryDashboard?.data;
 
   if (
     queryDashboard?.isLoading ||
@@ -116,62 +126,87 @@ const Home = () => {
         </p>
       </div>
 
-      {/* Balance Summary Card */}
-      <div className="px-4 -mt-4 mb-4">
-        <div
-          className={`bg-white rounded-xl shadow-md p-4 border-l-4 ${
-            overallBalance > 0
-              ? "border-green-500"
-              : overallBalance < 0
-              ? "border-red-500"
-              : "border-gray-500"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Your Overall Balance</p>
-              <p
-                className={`text-2xl font-bold ${
-                  overallBalance > 0
-                    ? "text-green-600"
-                    : overallBalance < 0
-                    ? "text-red-600"
-                    : "text-gray-600"
+      {/* ⭐ Multi-Currency Balance Cards */}
+      <div className="px-4 -mt-4 mb-4 space-y-3">
+        {dashboard?.currencyBalances?.length > 0 ? (
+          dashboard.currencyBalances.map((currencyBalance) => {
+            const balance = currencyBalance.balance;
+            const isPositive = balance > 0;
+            const isNegative = balance < 0;
+
+            return (
+              <div
+                key={currencyBalance.currency}
+                className={`bg-white rounded-xl shadow-md p-4 border-l-4 ${
+                  isPositive
+                    ? "border-green-500"
+                    : isNegative
+                    ? "border-red-500"
+                    : "border-gray-500"
                 }`}
               >
-                {overallBalance > 0 ? "+" : ""}₱
-                {Math.abs(overallBalance).toFixed(2)}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {overallBalance > 0
-                  ? "You are owed"
-                  : overallBalance < 0
-                  ? "You owe"
-                  : "All settled"}
-              </p>
-            </div>
-            <div
-              className={`p-3 rounded-full ${
-                overallBalance > 0
-                  ? "bg-green-100"
-                  : overallBalance < 0
-                  ? "bg-red-100"
-                  : "bg-gray-100"
-              }`}
-            >
-              <TrendingUp
-                className={
-                  overallBalance > 0
-                    ? "text-green-600"
-                    : overallBalance < 0
-                    ? "text-red-600"
-                    : "text-gray-600"
-                }
-                size={24}
-              />
-            </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    {/* Currency Badge */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                        {currencyBalance.currency || "PHP"}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {currencyBalance.tripCount}{" "}
+                        {currencyBalance.tripCount === 1 ? "trip" : "trips"}
+                      </span>
+                    </div>
+
+                    <p className="text-gray-600 text-sm mb-1">Your Balance</p>
+                    <p
+                      className={`text-2xl font-bold ${
+                        isPositive
+                          ? "text-green-600"
+                          : isNegative
+                          ? "text-red-600"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {isPositive ? "+" : ""}
+                      {currencyBalance.currencySymbol || "₱"}
+                      {Math.abs(balance).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {isPositive
+                        ? "You are owed"
+                        : isNegative
+                        ? "You owe"
+                        : "All settled"}
+                    </p>
+                  </div>
+
+                  <div
+                    className={`p-3 rounded-full ${
+                      isPositive
+                        ? "bg-green-100"
+                        : isNegative
+                        ? "bg-red-100"
+                        : "bg-gray-100"
+                    }`}
+                  >
+                    {isPositive ? (
+                      <TrendingUp className="text-green-600" size={24} />
+                    ) : isNegative ? (
+                      <TrendingDown className="text-red-600" size={24} />
+                    ) : (
+                      <DollarSign className="text-gray-600" size={24} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-gray-500">
+            <p className="text-gray-600 text-center">No trips yet</p>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Trips List */}
@@ -206,10 +241,19 @@ const Home = () => {
                 onClick={() => history.push(`/trips/${trip.id}`)}
                 className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 active:bg-gray-50 transition"
               >
+                {/* TOP ROW: Trip Name and Currency Tag */}
                 <div className="flex items-center justify-between mb-2">
+                  {/* Clean Trip Name */}
                   <h3 className="font-semibold text-gray-800">{trip.name}</h3>
-                  <span className="text-gray-400">›</span>
+
+                  {/* 🔹 NEW: Currency as a Tag (Clean and Visible) */}
+                  <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                    {trip.currency || "PHP"}
+                  </span>
+                  {/* <span className="text-gray-400">›</span> <-- Removed the arrow to make room for the tag, or move the arrow below */}
                 </div>
+
+                {/* BOTTOM ROW: Metadata and Total Expenses */}
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-3 text-gray-600">
                     <span className="flex items-center gap-1">
@@ -221,8 +265,11 @@ const Home = () => {
                       {formatDateRange(trip?.startDate, trip?.endDate)}
                     </span>
                   </div>
+
+                  {/* 🔹 NEW: Use the correct symbol for Total Expenses */}
                   <span className="font-semibold text-gray-800">
-                    ₱{trip.totalExpenses}
+                    {getCurrencySymbol(trip.currency)}
+                    {trip.totalExpenses}
                   </span>
                 </div>
               </div>

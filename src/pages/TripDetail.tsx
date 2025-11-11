@@ -11,13 +11,19 @@ import {
   Copy,
   Check,
   Users as UsersIcon,
+  PencilLine,
 } from "lucide-react";
 import useApi from "@/hooks/useApi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDateRange, formatRelativeDate, formatSmartDate } from "@/utils/date";
+import {
+  formatDateRange,
+  formatRelativeDate,
+  formatSmartDate,
+} from "@/utils/date";
 import toast from "react-hot-toast";
 import copy from "copy-to-clipboard";
 import { useAuth } from "@/context/AuthContext";
+import { getCurrencySymbol } from "@/lib/utils";
 
 // Skeleton Components
 const HeaderSkeleton = () => (
@@ -243,6 +249,21 @@ const TripDetail = () => {
                     </span>
                   </button>
 
+                  <button
+                    onClick={() =>
+                      history.push({
+                        pathname: `/trips/edit/${trip?.id}`,
+                        state: {
+                          trip,
+                        },
+                      })
+                    }
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 active:bg-gray-100 transition flex items-center gap-3 disabled:opacity-50"
+                  >
+                    <PencilLine size={18} className="text-gray-600" />
+                    <span className="text-gray-800 font-medium">Edit Trip</span>
+                  </button>
+
                   <div className="border-t border-gray-100 my-1" />
 
                   <button
@@ -267,11 +288,17 @@ const TripDetail = () => {
         <div className="grid grid-cols-2 gap-3 mt-4">
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
             <p className="text-blue-100 text-xs mb-1">Total Spent</p>
-            <p className="text-2xl font-bold">₱{trip?.totalSpent}</p>
+            <p className="text-2xl font-bold">
+              {getCurrencySymbol(trip?.currency)}
+              {trip?.totalSpent}
+            </p>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
             <p className="text-blue-100 text-xs mb-1">Your Share</p>
-            <p className="text-2xl font-bold">₱{trip?.yourShare}</p>
+            <p className="text-2xl font-bold">
+              {getCurrencySymbol(trip?.currency)}
+              {trip?.yourShare}
+            </p>
           </div>
         </div>
       </div>
@@ -305,7 +332,7 @@ const TripDetail = () => {
       </div>
 
       {/* Add Expense Button */}
-      {expenses.length > 0 && (
+      {trip && expenses.length > 0 && (
         <div className="px-4 mt-4">
           <button
             onClick={() =>
@@ -313,6 +340,7 @@ const TripDetail = () => {
                 pathname: `/trips/${tripId}/expenses/add`,
                 state: {
                   members: queryTripDetail?.data?.members,
+                  trip,
                 },
               })
             }
@@ -336,6 +364,7 @@ const TripDetail = () => {
                   pathname: `/trips/${tripId}/expenses/add`,
                   state: {
                     members: queryTripDetail?.data?.members,
+                    trip,
                   },
                 })
               }
@@ -376,7 +405,10 @@ const TripDetail = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-gray-800">₱{expense.amount}</p>
+                  <p className="font-bold text-gray-800">
+                    {getCurrencySymbol(expense?.currency!)}
+                    {expense.amount}
+                  </p>
                   <p className="text-xs text-gray-500">
                     split {expense?.splitCount} ways
                   </p>

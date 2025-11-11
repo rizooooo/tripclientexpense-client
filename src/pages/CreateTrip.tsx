@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useHistory } from "react-router-dom";
+import { useHistory, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useForm, Controller } from "react-hook-form";
@@ -17,7 +17,7 @@ import {
   FormControl,
   FormMessage,
 } from "@/components/ui/form";
-import type { TripCreateDto } from "api";
+import type { TripCreateDto, TripDetailDto } from "api";
 import useApi from "@/hooks/useApi";
 
 type TForm = TripCreateDto;
@@ -25,18 +25,27 @@ type TForm = TripCreateDto;
 const CreateTrip = () => {
   const history = useHistory();
   // const [step, setStep] = useState(1);
-  const { trip, user } = useApi();
+  const { trip } = useApi();
+  const { tripId } = useParams<{ tripId: string }>();
+  const { state } = useLocation<{ trip?: TripDetailDto }>();
+
+  const { trip: tripDetail } = state || {};
+
+  const isEditMode = Boolean(tripId && tripDetail);
 
   // ===============================
   // 🔹 React Hook Form Setup
   // ===============================
   const form = useForm<TForm>({
-    defaultValues: {
-      name: "",
-      description: "",
-      startDate: undefined as unknown as Date,
-      endDate: undefined as unknown as Date,
-    },
+    defaultValues: isEditMode
+      ? tripDetail
+      : {
+          name: "",
+          description: "",
+          startDate: undefined as unknown as Date,
+          endDate: undefined as unknown as Date,
+          currency: "PHP",
+        },
   });
 
   // ===============================
@@ -49,21 +58,45 @@ const CreateTrip = () => {
   //     return res.data || [];
   //   },
   // });
-
+  // A simple list of common currencies for the picker
+  const CURRENCIES = [
+    { value: "USD", label: "US Dollar ($)" },
+    { value: "EUR", label: "Euro (€)" },
+    { value: "GBP", label: "British Pound (£)" },
+    { value: "JPY", label: "Japanese Yen (¥)" },
+    { value: "AUD", label: "Australian Dollar (A$)" },
+    { value: "CAD", label: "Canadian Dollar (C$)" },
+    { value: "PHP", label: "Philippine Peso (₱)" },
+    // Add more currencies as needed
+  ];
   // ===============================
   // 🔹 Create Trip Mutation
   // ===============================
   const createTripMutation = useMutation({
     mutationFn: async (payload: TripCreateDto) =>
-      trip.apiTripsPost({
-        tripCreateDto: payload,
-      }),
+      isEditMode
+        ? trip.apiTripsIdPut({
+            id: +tripDetail?.id!,
+            tripCreateDto: payload,
+          })
+        : trip.apiTripsPost({
+            tripCreateDto: payload,
+          }),
     onSuccess: () => {
-      toast.success("Trip created successfully!");
-      history.push("/");
+      isEditMode
+        ? toast.success("Trip updated successfully!")
+        : toast.success("Trip created successfully!");
+
+      isEditMode
+        ? history.replace("/trips/" + tripDetail?.id)
+        : history.push("/");
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to create trip");
+      toast.error(
+        error.message || isEditMode
+          ? "Failed to update trip"
+          : "Failed to create trip"
+      );
     },
   });
 
@@ -112,6 +145,7 @@ const CreateTrip = () => {
       startDate: values.startDate,
       endDate: values.endDate,
       memberIds: [],
+      currency: values?.currency,
     });
   };
 
@@ -121,12 +155,18 @@ const CreateTrip = () => {
       <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => history.replace("/")}
+            onClick={() =>
+              isEditMode
+                ? history.replace("/trips/" + tripDetail?.id)
+                : history.replace("/")
+            }
             className="text-gray-600 active:text-gray-800"
           >
             <ArrowLeft size={24} />
           </button>
-          <h1 className="text-xl font-semibold">Create New Trip</h1>
+          <h1 className="text-xl font-semibold">
+            {isEditMode ? "Edit trip" : "Create New Trip"}
+          </h1>
         </div>
       </div>
 
@@ -178,7 +218,30 @@ const CreateTrip = () => {
                   </FormItem>
                 )}
               />
-
+              {/* Currency Picker Added Here */}
+              <FormField
+                control={form.control}
+                name="currency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Base Currency *</FormLabel>
+                    <FormControl>
+                      {/* Using a standard <select> for the currency picker */}
+                      <select
+                        {...field}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {CURRENCIES.map((currency) => (
+                          <option key={currency.value} value={currency.value}>
+                            {currency.label}
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
@@ -247,7 +310,12 @@ const CreateTrip = () => {
                 className="flex-1"
                 disabled={createTripMutation.isPending}
               >
-                {createTripMutation.isPending ? "Creating..." : "Create Trip"}
+                {!isEditMode && createTripMutation.isPending
+                  ? "Creating..."
+                  : "Create Trip"}
+                {isEditMode && createTripMutation.isPending
+                  ? "Updating..."
+                  : "Update Trip"}
               </Button>
             </div>
           </form>

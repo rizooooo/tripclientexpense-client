@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeDate } from "@/utils/date";
+import { getCurrencySymbol } from "@/lib/utils";
 
 const MemberDetail = () => {
   const history = useHistory();
@@ -49,6 +50,8 @@ const MemberDetail = () => {
     },
   });
 
+  const currency = getCurrencySymbol(breakdown?.currency);
+
   // FIX 2: Refined handler to ensure numbers are passed
   const setQuickAmount = (percentage: number) => {
     const netBalance = Math.abs(breakdown?.netBalance || 0);
@@ -81,7 +84,7 @@ const MemberDetail = () => {
           notes:
             amount === Math.abs(netBalance)
               ? "Full payment settlement"
-              : `Partial payment: ₱${amount.toFixed(2)}`,
+              : `Partial payment: ${currency}${amount.toFixed(2)}`,
         },
       });
     },
@@ -92,7 +95,9 @@ const MemberDetail = () => {
       queryClient.invalidateQueries(["getUserDashboard"]);
 
       toast.success(
-        `Recorded ₱${amount.toFixed(2)} payment from ${breakdown?.userName}`
+        `Recorded ${currency}${amount.toFixed(2)} payment from ${
+          breakdown?.userName
+        }`
       );
       history.goBack();
     },
@@ -117,7 +122,7 @@ const MemberDetail = () => {
     }
 
     if (amount > netBalance) {
-      toast.error(`Amount cannot exceed ₱${netBalance.toFixed(2)}`);
+      toast.error(`Amount cannot exceed ${currency}${netBalance.toFixed(2)}`);
       return;
     }
 
@@ -188,7 +193,6 @@ const MemberDetail = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 pb-8">
         <div className="flex items-center gap-3 mb-6">
           <button
@@ -214,158 +218,67 @@ const MemberDetail = () => {
                 : "text-white"
             }`}
           >
-            {isOwing ? "Owes" : isGettingBack ? "Gets back" : "Settled"} ₱
+            {isOwing ? "Owes" : isGettingBack ? "Gets back" : "Settled"}{" "}
+            {currency}
             {Math.abs(netBalance).toFixed(2)}
           </p>
           <p className="text-blue-100 text-sm">in {breakdown.tripName}</p>
         </div>
       </div>
 
-      {/* Expense Breakdown (Now Running Transactions) */}
-      <div className="px-4 mt-4">
-        <h3 className="text-sm font-semibold text-gray-600 uppercase mb-3">
-          Transaction History
-        </h3>
-
-        <div className="space-y-3">
-          {breakdown.transactions?.map((transaction) => {
-            const isExpense = transaction.type === "Expense";
-            const isPayment = transaction.type === "Payment";
-            const isPositive = transaction.amount > 0;
-
-            return (
-              <div key={`${transaction.type}-${transaction.transactionId}`}>
-                {/* Transaction Card */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-start gap-3 flex-1">
-                      {/* Icon */}
-                      <div
-                        className={`p-2 rounded-lg ${
-                          isExpense
-                            ? isPositive
-                              ? "bg-green-100"
-                              : "bg-red-100"
-                            : isPayment
-                            ? "bg-blue-100"
-                            : "bg-purple-100"
-                        }`}
-                      >
-                        {isExpense ? (
-                          <Receipt
-                            className={
-                              isPositive ? "text-green-600" : "text-red-600"
-                            }
-                            size={18}
-                          />
-                        ) : (
-                          <CreditCard
-                            className={
-                              isPayment ? "text-blue-600" : "text-purple-600"
-                            }
-                            size={18}
-                          />
-                        )}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-semibold text-gray-800">
-                            {transaction.description}
-                          </p>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full ${
-                              isExpense
-                                ? "bg-gray-100 text-gray-600"
-                                : isPayment
-                                ? "bg-blue-100 text-blue-600"
-                                : "bg-purple-100 text-purple-600"
-                            }`}
-                          >
-                            {transaction.type}
-                          </span>
-                        </div>
-
-                        <p className="text-xs text-gray-500">
-                          {formatRelativeDate(transaction?.date)}
-                        </p>
-
-                        {/* Additional Info */}
-                        {isExpense && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            {transaction.isUserPayer
-                              ? `${breakdown.userName} paid`
-                              : `Paid by ${transaction.paidByName}`}
-                            {transaction.totalExpenseAmount && (
-                              <span className="text-gray-400">
-                                {" "}
-                                • Total: ₱
-                                {transaction.totalExpenseAmount.toFixed(2)}
-                              </span>
-                            )}
-                          </p>
-                        )}
-
-                        {transaction.notes && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            {transaction.notes}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Amount */}
-                    <div className="text-right ml-3">
-                      <p
-                        className={`text-lg font-bold ${
-                          isPositive ? "text-green-600" : "text-red-600"
-                        }`}
-                      >
-                        {isPositive ? "+" : ""}₱
-                        {Math.abs(transaction.amount).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Running Balance */}
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">
-                        Balance after this
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {transaction.runningBalance < 0 ? (
-                          <TrendingDown className="text-red-500" size={14} />
-                        ) : transaction.runningBalance > 0 ? (
-                          <TrendingUp className="text-green-500" size={14} />
-                        ) : null}
-                        <span
-                          className={`text-sm font-semibold ${
-                            transaction.runningBalance < 0
-                              ? "text-red-600"
-                              : transaction.runningBalance > 0
-                              ? "text-green-600"
-                              : "text-gray-600"
-                          }`}
-                        >
-                          ₱{Math.abs(transaction.runningBalance).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+      <div className="px-4 mt-4 space-y-4">
+        {/* Current Balance Card - First, most important */}
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border-2 border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-xs uppercase tracking-wide font-semibold mb-1">
+                Current Balance
+              </p>
+              <p className="text-2xl font-bold text-gray-800">
+                {isOwing ? "Owes" : isGettingBack ? "Gets back" : "Settled"}
+              </p>
+            </div>
+            <p
+              className={`text-4xl font-bold ${
+                isOwing
+                  ? "text-red-600"
+                  : isGettingBack
+                  ? "text-green-600"
+                  : "text-gray-600"
+              }`}
+            >
+              {currency}
+              {Math.abs(netBalance).toFixed(2)}
+            </p>
+          </div>
         </div>
 
-        {/* Info message when user is getting money back */}
+        {/* Action Buttons - Second, main CTA */}
+        {isOwing && (
+          <div className="space-y-3">
+            <button
+              onClick={handleFullPayment}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 active:bg-blue-800 transition flex items-center justify-center gap-2 shadow-md"
+            >
+              <CreditCard size={20} />
+              Record Full Payment ({currency}
+              {Math.abs(netBalance).toFixed(2)})
+            </button>
+
+            <button
+              onClick={() => setShowPaymentModal(true)}
+              className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-200 active:bg-gray-300 transition"
+            >
+              Record Partial Payment
+            </button>
+          </div>
+        )}
+
+        {/* Info Messages - Third, contextual help */}
         {isGettingBack && (
-          <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-4">
-            {/* FIX 1: Use currentAuth name (the viewer/debtor) and breakdown name (the creditor) */}
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
             <p className="text-sm text-green-800 text-center font-medium mb-1">
-              **{currentUserName}** owes **{breakdown.userName}** ₱
+              {currentUserName} owes {breakdown.userName} {currency}
               {Math.abs(netBalance).toFixed(2)}
             </p>
             <p className="text-xs text-green-600 text-center">
@@ -375,53 +288,150 @@ const MemberDetail = () => {
           </div>
         )}
 
-        {/* Settled message */}
         {isSettled && (
-          <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
             <p className="text-sm text-gray-600 text-center font-medium">
               ✓ All settled up with {breakdown.userName}
             </p>
           </div>
         )}
 
-        {/* Final Balance Card */}
-        <div className="mt-6 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm mb-1">Current Balance</p>
-              <p className="text-3xl font-bold">
-                {isOwing ? "Owes" : isGettingBack ? "Gets back" : "Settled"}
-              </p>
-            </div>
-            <p className="text-4xl font-bold">
-              ₱{Math.abs(netBalance).toFixed(2)}
-            </p>
+        {/* Transaction History - Last, detailed breakdown */}
+        <div className="pt-4">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase mb-3">
+            Transaction History
+          </h3>
+
+          <div className="space-y-3">
+            {breakdown.transactions?.map((transaction) => {
+              const isExpense = transaction.type === "Expense";
+              const isPayment = transaction.type === "Payment";
+              const isPositive = transaction.amount > 0;
+
+              return (
+                <div key={`${transaction.type}-${transaction.transactionId}`}>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-start gap-3 flex-1">
+                        <div
+                          className={`p-2 rounded-lg ${
+                            isExpense
+                              ? isPositive
+                                ? "bg-green-100"
+                                : "bg-red-100"
+                              : isPayment
+                              ? "bg-blue-100"
+                              : "bg-purple-100"
+                          }`}
+                        >
+                          {isExpense ? (
+                            <Receipt
+                              className={
+                                isPositive ? "text-green-600" : "text-red-600"
+                              }
+                              size={18}
+                            />
+                          ) : (
+                            <CreditCard
+                              className={
+                                isPayment ? "text-blue-600" : "text-purple-600"
+                              }
+                              size={18}
+                            />
+                          )}
+                        </div>
+
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-semibold text-gray-800">
+                              {transaction.description}
+                            </p>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                isExpense
+                                  ? "bg-gray-100 text-gray-600"
+                                  : isPayment
+                                  ? "bg-blue-100 text-blue-600"
+                                  : "bg-purple-100 text-purple-600"
+                              }`}
+                            >
+                              {transaction.type}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-gray-500">
+                            {formatRelativeDate(transaction?.date)}
+                          </p>
+
+                          {isExpense && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {transaction.isUserPayer
+                                ? `${breakdown.userName} paid`
+                                : `Paid by ${transaction.paidByName}`}
+                              {transaction.totalExpenseAmount && (
+                                <span className="text-gray-400">
+                                  {" "}
+                                  • Total: {currency}
+                                  {transaction.totalExpenseAmount.toFixed(2)}
+                                </span>
+                              )}
+                            </p>
+                          )}
+
+                          {transaction.notes && (
+                            <p className="text-xs text-gray-400 mt-1">
+                              {transaction.notes}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-right ml-3">
+                        <p
+                          className={`text-lg font-bold ${
+                            isPositive ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          {isPositive ? "+" : ""}
+                          {currency}
+                          {Math.abs(transaction.amount).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">
+                          Balance after this
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {transaction.runningBalance < 0 ? (
+                            <TrendingDown className="text-red-500" size={14} />
+                          ) : transaction.runningBalance > 0 ? (
+                            <TrendingUp className="text-green-500" size={14} />
+                          ) : null}
+                          <span
+                            className={`text-sm font-semibold ${
+                              transaction.runningBalance < 0
+                                ? "text-red-600"
+                                : transaction.runningBalance > 0
+                                ? "text-green-600"
+                                : "text-gray-600"
+                            }`}
+                          >
+                            {currency}
+                            {Math.abs(transaction.runningBalance).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
-
-        {/* Action Buttons - Only show if user OWES money */}
-        {isOwing && (
-          <div className="space-y-3 mt-4">
-            {/* Full Payment Button */}
-            <button
-              onClick={handleFullPayment}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 active:bg-blue-800 transition flex items-center justify-center gap-2"
-            >
-              <CreditCard size={20} />
-              Record Full Payment (₱{Math.abs(netBalance).toFixed(2)})
-            </button>
-
-            {/* Partial Payment Button */}
-            <button
-              onClick={() => setShowPaymentModal(true)}
-              className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-200 active:bg-gray-300 transition"
-            >
-              Record Partial Payment
-            </button>
-          </div>
-        )}
       </div>
-
       {/* Partial Payment Modal (Modal content remains unchanged) */}
       {showPaymentModal && (
         <>
@@ -460,7 +470,7 @@ const MemberDetail = () => {
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 text-2xl font-semibold">
-                    ₱
+                    {currency}
                   </span>
                   <input
                     type="number"
@@ -475,7 +485,8 @@ const MemberDetail = () => {
                   />
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  Maximum: ₱{Math.abs(netBalance).toFixed(2)}
+                  Maximum: {currency}
+                  {Math.abs(netBalance).toFixed(2)}
                 </p>
               </div>
 
@@ -520,7 +531,8 @@ const MemberDetail = () => {
                       Payment amount:
                     </span>
                     <span className="text-lg font-bold text-blue-600">
-                      ₱{parseFloat(paymentAmount).toFixed(2)}
+                      {currency}
+                      {parseFloat(paymentAmount).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -528,7 +540,7 @@ const MemberDetail = () => {
                       Remaining balance:
                     </span>
                     <span className="text-lg font-bold text-gray-800">
-                      ₱
+                      {currency}
                       {(
                         Math.abs(netBalance) - parseFloat(paymentAmount)
                       ).toFixed(2)}
