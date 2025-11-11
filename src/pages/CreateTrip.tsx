@@ -310,12 +310,16 @@ const CreateTrip = () => {
                 className="flex-1"
                 disabled={createTripMutation.isPending}
               >
+                {/* Check if creating and pending: show "Creating..." */}
                 {!isEditMode && createTripMutation.isPending
                   ? "Creating..."
-                  : "Create Trip"}
-                {isEditMode && createTripMutation.isPending
+                  : // Check if updating and pending: show "Updating..."
+                  isEditMode && createTripMutation.isPending
                   ? "Updating..."
-                  : "Update Trip"}
+                  : // Otherwise, show the default text based on mode
+                  isEditMode
+                  ? "Update Trip"
+                  : "Create Trip"}
               </Button>
             </div>
           </form>
