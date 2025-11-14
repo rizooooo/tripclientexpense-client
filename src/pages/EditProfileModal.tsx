@@ -13,7 +13,7 @@ const EditProfileModal = ({ isOpen, onClose }: EditProfileModalProps) => {
   const { currentAuth, setSession } = useAuth(); // Assuming you have these
   const { user } = useApi();
   const [formData, setFormData] = useState({
-    name: currentAuth?.userName || "",
+    name: currentAuth?.name || "",
     email: currentAuth?.email || "",
     avatar: currentAuth?.avatar || "",
   });
