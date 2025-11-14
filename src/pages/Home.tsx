@@ -21,33 +21,21 @@ const Home = () => {
 
   const queryDashboard = useQuery({
     queryFn: async () => {
-      const response = await trip.apiTripsUserUserIdDashboardGet({ userId: 5 });
+      const response = await trip.apiTripsUserDashboardGet();
 
       return response;
     },
     queryKey: ["getDashboardTotalShare"],
   });
 
-  const queryTrips = useQuery({
-    queryFn: async () => {
-      const response = await trip.apiTripsGet();
-
-      return response;
-    },
-    queryKey: ["getUsers"],
-  });
-
-  const trips = queryTrips?.data || [];
+  const trips = queryDashboard?.data?.recentTrips || [];
 
   const dashboard = queryDashboard?.data;
 
   if (
     queryDashboard?.isLoading ||
-    queryTrips?.isLoading ||
     queryDashboard?.isRefetching ||
-    queryTrips?.isRefetching ||
-    queryDashboard?.isFetching ||
-    queryTrips?.isFetching
+    queryDashboard?.isFetching
   ) {
     return (
       <div className="min-h-screen bg-gray-50 pb-20 animate-pulse">

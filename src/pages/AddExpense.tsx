@@ -27,17 +27,13 @@ const AddExpense = () => {
     trip: TripDetailDto;
   }>();
 
-  console.log({ trip });
-
   const isEditMode = !!expenseId;
 
   const queryGetExpense = useQuery({
     queryKey: [`getExpenseByIdEdit`, { expenseId }],
     enabled: isEditMode,
-
     queryFn: async () => {
       const response = await expenseApi.apiExpensesIdGet({ id: +expenseId });
-
       return response;
     },
   });
@@ -57,12 +53,23 @@ const AddExpense = () => {
     members.reduce((acc, m) => ({ ...acc, [m.userId]: "" }), {})
   );
 
+  // NEW: For "Paid For" mode
+  const [paidForMembers, setPaidForMembers] = useState<number[]>([]);
+
   const toggleMember = (memberId: number) => {
-    setSelectedMembers((prev) =>
-      prev.includes(memberId)
-        ? prev.filter((id) => id !== memberId)
-        : [...prev, memberId]
-    );
+    if (splitType === "PaidFor") {
+      setPaidForMembers((prev) =>
+        prev.includes(memberId)
+          ? prev.filter((id) => id !== memberId)
+          : [...prev, memberId]
+      );
+    } else {
+      setSelectedMembers((prev) =>
+        prev.includes(memberId)
+          ? prev.filter((id) => id !== memberId)
+          : [...prev, memberId]
+      );
+    }
   };
 
   const updateCustomAmount = (memberId: number, value: number) => {
@@ -86,9 +93,7 @@ const AddExpense = () => {
         return;
       }
       await expenseApi.apiExpensesPost({
-        expenseCreateDto: {
-          ...params,
-        },
+        expenseCreateDto: params,
       });
     },
     onSuccess: () => {
@@ -103,10 +108,13 @@ const AddExpense = () => {
         id: +expenseId,
       });
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries([`getTripDetail`]);
+      queryClient.invalidateQueries([`getTripExpenses`]);
+    },
   });
 
   const handleSubmit = async () => {
-    // Validation
     if (
       !expenseData.description ||
       !expenseData.amount ||
@@ -121,6 +129,11 @@ const AddExpense = () => {
       return;
     }
 
+    if (splitType === "PaidFor" && paidForMembers.length === 0) {
+      toast.error("Select at least one person this was paid for");
+      return;
+    }
+
     if (splitType === "Custom") {
       const total = calculateTotal();
       const expenseAmount = parseFloat(expenseData.amount);
@@ -129,18 +142,24 @@ const AddExpense = () => {
         return;
       }
     }
+
     const isSplitEqual = splitType === "Equal";
+    const isPaidFor = splitType === "PaidFor";
 
     await mutation.mutateAsync({
       amount: +expenseData?.amount,
       description: expenseData?.description,
-      paidByUserId: +expenseData?.paidBy, // todo should be handled BE,
+      paidByUserId: +expenseData?.paidBy,
       splitType,
       tripId: +tripId,
       category: "",
-
       splits: isSplitEqual
         ? null
+        : isPaidFor
+        ? paidForMembers.map((userId) => ({
+            userId: userId,
+            amount: parseFloat(expenseData.amount) / paidForMembers.length, // Equal split among paid-for members
+          }))
         : members?.map((item) => ({
             userId: item?.userId,
             amount:
@@ -150,7 +169,6 @@ const AddExpense = () => {
           })),
     });
 
-    // TODO: Save expense to database
     toast.success(isEditMode ? "Expense updated!" : "Expense added!");
     history.goBack();
   };
@@ -166,10 +184,16 @@ const AddExpense = () => {
   }, [queryGetExpense?.isSuccess, isEditMode]);
 
   const currency = getCurrencySymbol(trip?.currency);
+  const equalShare = expenseData.amount
+    ? (parseFloat(expenseData.amount) / selectedMembers.length).toFixed(2)
+    : "0.00";
+  const paidForShare =
+    expenseData.amount && paidForMembers.length > 0
+      ? (parseFloat(expenseData.amount) / paidForMembers.length).toFixed(2)
+      : "0.00";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <button
@@ -185,7 +209,6 @@ const AddExpense = () => {
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Basic Info */}
         <div className="bg-white rounded-xl p-5 shadow-sm space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -240,14 +263,13 @@ const AddExpense = () => {
           </div>
         </div>
 
-        {/* Split Method */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-800">Split Method</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setSplitType("Equal")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition ${
                   splitType === "Equal"
                     ? "bg-blue-600 text-white"
                     : "bg-gray-100 text-gray-600 active:bg-gray-200"
@@ -257,7 +279,7 @@ const AddExpense = () => {
               </button>
               <button
                 onClick={() => setSplitType("Custom")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition ${
                   splitType === "Custom"
                     ? "bg-blue-600 text-white"
                     : "bg-gray-100 text-gray-600 active:bg-gray-200"
@@ -265,32 +287,41 @@ const AddExpense = () => {
               >
                 Custom
               </button>
+              <button
+                onClick={() => setSplitType("PaidFor")}
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  splitType === "PaidFor"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-600 active:bg-gray-200"
+                }`}
+              >
+                Paid For
+              </button>
             </div>
           </div>
 
-          {splitType === "Equal" ? (
+          {splitType === "Equal" && (
             <>
+              <p className="text-sm text-gray-600 mb-3">
+                Split equally among selected members
+              </p>
               <div className="space-y-2">
                 {members.map((member) => {
                   const isSelected = selectedMembers.includes(member.userId);
-                  const equalShare = expenseData.amount
-                    ? (
-                        parseFloat(expenseData.amount) / selectedMembers.length
-                      ).toFixed(2)
-                    : "0.00";
-
                   return (
                     <label
                       key={member.id}
                       className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition ${
-                        isSelected ? "bg-blue-50" : "hover:bg-gray-50"
+                        isSelected
+                          ? "bg-blue-50 border-2 border-blue-200"
+                          : "bg-gray-50 border-2 border-transparent"
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleMember(member.userId!)}
-                        className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        className="w-5 h-5 text-blue-600 rounded"
                       />
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold text-sm">
                         {member.avatar}
@@ -299,8 +330,9 @@ const AddExpense = () => {
                         {member.name}
                       </span>
                       {isSelected && (
-                        <span className="text-sm font-semibold text-gray-700">
-                          {currency}{equalShare}
+                        <span className="text-sm font-semibold text-blue-600">
+                          {currency}
+                          {equalShare}
                         </span>
                       )}
                     </label>
@@ -308,11 +340,72 @@ const AddExpense = () => {
                 })}
               </div>
               <p className="text-xs text-gray-500 mt-3 text-center">
-                Each person pays an equal share
+                Each selected person pays an equal share
               </p>
             </>
-          ) : (
+          )}
+
+          {splitType === "PaidFor" && (
             <>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  <strong>
+                    {members.find((m) => m.userId === +expenseData.paidBy)
+                      ?.name || "Payer"}
+                  </strong>{" "}
+                  will cover the full amount for selected people
+                </p>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                Who is this expense for?
+              </p>
+              <div className="space-y-2">
+                {members
+                  .filter((m) => m.userId !== +expenseData.paidBy)
+                  .map((member) => {
+                    const isSelected = paidForMembers.includes(member.userId);
+                    return (
+                      <label
+                        key={member.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition ${
+                          isSelected
+                            ? "bg-green-50 border-2 border-green-200"
+                            : "bg-gray-50 border-2 border-transparent"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleMember(member.userId!)}
+                          className="w-5 h-5 text-green-600 rounded"
+                        />
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center text-white font-semibold text-sm">
+                          {member.avatar}
+                        </div>
+                        <span className="flex-1 font-medium text-gray-800">
+                          {member.name}
+                        </span>
+                        {isSelected && (
+                          <span className="text-sm font-semibold text-green-600">
+                            {currency}
+                            {paidForShare}
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+              </div>
+              <p className="text-xs text-gray-500 mt-3 text-center">
+                Selected people will owe the payer their share
+              </p>
+            </>
+          )}
+
+          {splitType === "Custom" && (
+            <>
+              <p className="text-sm text-gray-600 mb-3">
+                Enter custom amount for each person
+              </p>
               <div className="space-y-3">
                 {members.map((member) => (
                   <div
@@ -347,7 +440,6 @@ const AddExpense = () => {
                   <span className="text-sm font-medium text-gray-700">
                     Total Split Amount
                   </span>
-
                   <span
                     className={`text-lg font-bold ${
                       Math.abs(
@@ -357,24 +449,8 @@ const AddExpense = () => {
                         : "text-red-600"
                     }`}
                   >
-                    {currency}{calculateTotal().toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-sm font-medium text-gray-700">
-                    Total Remaining Amount
-                  </span>
-
-                  <span
-                    className={`text-lg font-bold ${
-                      Math.abs(
-                        calculateTotal() - parseFloat(expenseData.amount || 0)
-                      ) < 0.01
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {currency}{calculateTotal().toFixed(2)}
+                    {currency}
+                    {calculateTotal().toFixed(2)}
                   </span>
                 </div>
                 {expenseData.amount &&
@@ -393,15 +469,18 @@ const AddExpense = () => {
           )}
         </div>
 
-        {/* Submit Button */}
         <button
           onClick={handleSubmit}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 active:bg-blue-800 transition"
+          disabled={mutation.isPending}
+          className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 active:bg-blue-800 transition disabled:bg-gray-400"
         >
-          {isEditMode ? "Update Expense" : "Add Expense"}
+          {mutation.isPending
+            ? "Saving..."
+            : isEditMode
+            ? "Update Expense"
+            : "Add Expense"}
         </button>
 
-        {/* Delete Button (only in edit mode) */}
         {isEditMode && (
           <button
             disabled={deleteMutation.isPending}
@@ -410,7 +489,6 @@ const AddExpense = () => {
                 window.confirm("Are you sure you want to delete this expense?")
               ) {
                 deleteMutation.mutate();
-                // TODO: Delete expense
                 toast.success("Expense deleted");
                 history.goBack();
               }

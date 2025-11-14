@@ -71,7 +71,7 @@ const Login = () => {
 
       toast.success("Login successful!");
       history.push("/");
-    } catch (error) {
+    } catch (err) {
       toast.error("Invalid email or password");
     } finally {
       setIsLoading(false);

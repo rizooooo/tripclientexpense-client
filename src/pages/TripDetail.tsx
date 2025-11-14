@@ -12,6 +12,8 @@ import {
   Check,
   Users as UsersIcon,
   PencilLine,
+  ChevronRight,
+  Users,
 } from "lucide-react";
 import useApi from "@/hooks/useApi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,6 +26,21 @@ import toast from "react-hot-toast";
 import copy from "copy-to-clipboard";
 import { useAuth } from "@/context/AuthContext";
 import { getCurrencySymbol } from "@/lib/utils";
+
+const getSplitLabel = (splitType: string, splitCount: number) => {
+  switch (splitType) {
+    case "Equal":
+      return `split ${splitCount} ways`;
+    case "Custom":
+      return `${splitCount} custom splits`;
+    case "PaidFor":
+      return `paid for ${splitCount} ${splitCount === 1 ? "person" : "people"}`;
+    case "Percentage":
+      return `${splitCount} % splits`;
+    default:
+      return `${splitCount} splits`;
+  }
+};
 
 // Skeleton Components
 const HeaderSkeleton = () => (
@@ -99,6 +116,7 @@ const LoadingSkeleton = () => (
 const TripDetail = () => {
   const history = useHistory();
   const queryClient = useQueryClient();
+  const [showMembers, setShowMembers] = useState(false);
   const { trip: tripApi, expense } = useApi();
   const { tripId } = useParams<{ tripId: string }>();
 
@@ -303,6 +321,80 @@ const TripDetail = () => {
         </div>
       </div>
 
+      {/* NEW: Members Section - Below Header */}
+      <div className="px-4 -mt-2 mb-4 relative z-10">
+        <button
+          onClick={() => setShowMembers(!showMembers)}
+          className="w-full bg-white rounded-xl shadow-md p-4 flex items-center justify-between hover:shadow-lg transition active:scale-98"
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-purple-100 p-2 rounded-lg">
+              <Users className="text-purple-600" size={20} />
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-gray-800">Trip Members</p>
+              <p className="text-xs text-gray-500">
+                {trip?.members?.length || 0} people
+              </p>
+            </div>
+          </div>
+
+          {/* Member Avatars Preview */}
+          <div className="flex items-center gap-2">
+            <div className="flex -space-x-2">
+              {trip?.members?.slice(0, 3).map((member, index) => (
+                <div
+                  key={member.id}
+                  className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-semibold border-2 border-white"
+                  style={{ zIndex: 3 - index }}
+                >
+                  {member.avatar}
+                </div>
+              ))}
+              {trip?.members?.length > 3 && (
+                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-xs font-semibold border-2 border-white">
+                  +{trip.members.length - 3}
+                </div>
+              )}
+            </div>
+            <ChevronRight
+              className={`text-gray-400 transition-transform ${
+                showMembers ? "rotate-90" : ""
+              }`}
+              size={20}
+            />
+          </div>
+        </button>
+
+        {/* Expandable Members List */}
+        {showMembers && (
+          <div className="mt-2 bg-white rounded-xl shadow-md overflow-hidden animate-slide-down">
+            {trip?.members?.map((member) => (
+              <div
+                key={member.id}
+                onClick={() =>
+                  history.push(`/trips/${tripId}/members/${member.userId}`)
+                }
+                className="flex items-center gap-3 p-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 active:bg-gray-100 transition cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+                  {member.avatar}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-800">{member.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {member.userId === currentAuth?.userId
+                      ? "You"
+                      : "Trip member"}
+                  </p>
+                </div>
+                <ChevronRight className="text-gray-400" size={16} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Tab Navigation */}
       <div className="bg-white border-b border-gray-200 px-4 flex gap-6 sticky top-0 z-10">
         <button
@@ -410,7 +502,7 @@ const TripDetail = () => {
                     {expense.amount}
                   </p>
                   <p className="text-xs text-gray-500">
-                    split {expense?.splitCount} ways
+                    {getSplitLabel(expense?.splitType, expense.splitCount)}
                   </p>
                 </div>
               </div>
