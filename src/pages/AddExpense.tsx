@@ -139,7 +139,7 @@ const AddExpense = () => {
   const [expenseData, setExpenseData] = useState({
     description: "",
     amount: "",
-    paidBy: "",
+    paidBy: currentAuth?.userId,
   });
 
   const [selectedMembers, setSelectedMembers] = useState([]);
@@ -439,7 +439,6 @@ const AddExpense = () => {
                   : ""
               }`}
             >
-              <option value="">Select member...</option>
               {members.map((member) => (
                 <option key={member.id} value={member.userId}>
                   {member.name}{" "}
@@ -476,16 +475,18 @@ const AddExpense = () => {
                 >
                   Custom
                 </button>
-                <button
-                  onClick={() => setSplitType("PaidFor")}
-                  className={`px-3 py-2 rounded-lg text-xs font-medium transition ${
-                    splitType === "PaidFor"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-600 active:bg-gray-200"
-                  }`}
-                >
-                  Paid For
-                </button>
+                {expenseData?.paidBy && (
+                  <button
+                    onClick={() => setSplitType("PaidFor")}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition ${
+                      splitType === "PaidFor"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-600 active:bg-gray-200"
+                    }`}
+                  >
+                    Paid For
+                  </button>
+                )}
               </div>
             </div>
 
