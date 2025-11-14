@@ -1,16 +1,98 @@
 import React, { useEffect, useState } from "react";
 import { useHistory, useLocation, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, Info, Lock, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Calculator,
+  Info,
+  Lock,
+  Users,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import useApi from "@/hooks/useApi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ExpenseCreateDto, TripDetailDto, TripMemberDto } from "api";
 import { useAuth } from "@/context/AuthContext";
 import { getCurrencySymbol } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const AddExpenseSkeleton = () => {
+  return (
+    <div className="min-h-screen bg-gray-50 pb-6">
+      {/* Header Skeleton */}
+      <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <Skeleton className="w-6 h-6" />
+          <Skeleton className="w-32 h-6" />
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* Basic Info Skeleton */}
+        <div className="bg-white rounded-xl p-5 shadow-sm space-y-4">
+          {/* Description */}
+          <div>
+            <Skeleton className="w-24 h-4 mb-2" />
+            <Skeleton className="w-full h-12 rounded-lg" />
+          </div>
+
+          {/* Amount */}
+          <div>
+            <Skeleton className="w-32 h-4 mb-2" />
+            <Skeleton className="w-full h-16 rounded-lg" />
+          </div>
+
+          {/* Paid By */}
+          <div>
+            <Skeleton className="w-20 h-4 mb-2" />
+            <Skeleton className="w-full h-12 rounded-lg" />
+          </div>
+        </div>
+
+        {/* Split Method Skeleton */}
+        <div className="bg-white rounded-xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <Skeleton className="w-24 h-5" />
+            <div className="flex gap-2">
+              <Skeleton className="w-16 h-9 rounded-lg" />
+              <Skeleton className="w-16 h-9 rounded-lg" />
+              <Skeleton className="w-20 h-9 rounded-lg" />
+            </div>
+          </div>
+
+          <Skeleton className="w-48 h-4 mb-3" />
+
+          {/* Member List Skeleton */}
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 p-3 rounded-lg bg-gray-50"
+              >
+                <Skeleton className="w-5 h-5 rounded" />
+                <Skeleton className="w-10 h-10 rounded-full" />
+                <Skeleton className="flex-1 h-5" />
+                <Skeleton className="w-16 h-5" />
+              </div>
+            ))}
+          </div>
+
+          <Skeleton className="w-full h-4 mt-3 mx-auto" />
+        </div>
+
+        {/* Submit Button Skeleton */}
+        <Skeleton className="w-full h-12 rounded-lg" />
+
+        {/* Delete Button Skeleton (for edit mode) */}
+        <Skeleton className="w-full h-12 rounded-lg" />
+      </div>
+    </div>
+  );
+};
 
 const AddExpense = () => {
   const { currentAuth } = useAuth();
-  const { user, expense: expenseApi } = useApi();
+  const { user, expense: expenseApi, trip: tripApi } = useApi();
 
   const history = useHistory();
   const queryClient = useQueryClient();
@@ -20,12 +102,27 @@ const AddExpense = () => {
     expenseId: string;
   }>();
 
-  const {
-    state: { members, trip },
-  } = useLocation<{
-    members: TripMemberDto[];
-    trip: TripDetailDto;
-  }>();
+  const queryTripDetail = useQuery({
+    queryKey: [`getTripDetail`, { tripId }],
+    queryFn: async () => {
+      const response = await tripApi.apiTripsIdDetailsGet({
+        id: +tripId,
+      });
+
+      return response;
+    },
+    enabled: !!tripId,
+  });
+
+  const trip = queryTripDetail?.data;
+  const members = trip?.members || [];
+
+  // const {
+  //   state: { members, trip },
+  // } = useLocation<{
+  //   members: TripMemberDto[];
+  //   trip: TripDetailDto;
+  // }>();
 
   const isEditMode = !!expenseId;
 
@@ -45,13 +142,9 @@ const AddExpense = () => {
     paidBy: "",
   });
 
-  const [selectedMembers, setSelectedMembers] = useState(
-    members.map((m) => m.userId)
-  );
+  const [selectedMembers, setSelectedMembers] = useState([]);
 
-  const [customAmounts, setCustomAmounts] = useState(
-    members.reduce((acc, m) => ({ ...acc, [m.userId]: "" }), {})
-  );
+  const [customAmounts, setCustomAmounts] = useState({});
 
   // NEW: For "Paid For" mode
   const [paidForMembers, setPaidForMembers] = useState<number[]>([]);
@@ -174,14 +267,61 @@ const AddExpense = () => {
   };
 
   useEffect(() => {
-    if (isEditMode && queryGetExpense?.isSuccess && queryGetExpense?.data) {
-      setExpenseData({
-        amount: queryGetExpense?.data?.amount,
-        description: queryGetExpense?.data?.description,
-        paidBy: queryGetExpense?.data?.paidByUserId,
-      });
+    if (queryTripDetail?.isSuccess) {
+      setSelectedMembers(
+        queryTripDetail?.data?.members?.map((item) => item.userId)
+      );
+
+      setCustomAmounts(
+        members.reduce((acc, m) => ({ ...acc, [m.userId]: "" }), {})
+      );
     }
-  }, [queryGetExpense?.isSuccess, isEditMode]);
+  }, [queryTripDetail.isSuccess]);
+
+  useEffect(() => {
+    if (isEditMode && queryGetExpense?.isSuccess && queryGetExpense?.data) {
+      const expenseData = queryGetExpense.data;
+
+      // Set basic expense data
+      setExpenseData({
+        amount: expenseData.amount,
+        description: expenseData.description,
+        paidBy: expenseData.paidByUserId,
+      });
+
+      // Set split type
+      if (expenseData.splitType) {
+        setSplitType(expenseData.splitType);
+      }
+
+      // Handle different split types
+      if (expenseData.splitType === "Custom" && expenseData.splits) {
+        // Populate custom amounts
+        const customAmountsMap = expenseData.splits.reduce(
+          (acc, split) => ({
+            ...acc,
+            [split.userId]: split.amount || 0,
+          }),
+          {}
+        );
+        setCustomAmounts(customAmountsMap);
+
+        // Set selected members (those with amounts)
+        const memberIds = expenseData.splits
+          .filter((s) => s.amount && s.amount > 0)
+          .map((s) => s.userId);
+        setSelectedMembers(memberIds);
+      } else if (expenseData.splitType === "PaidFor" && expenseData.splits) {
+        // Set paid-for members
+        const paidForIds = expenseData.splits.map((s) => s.userId);
+        setPaidForMembers(paidForIds);
+      } else if (expenseData.splitType === "Equal" && expenseData.splits) {
+        // Set selected members for equal split
+        const memberIds = expenseData.splits.map((s) => s.userId);
+        setSelectedMembers(memberIds);
+      }
+    }
+  }, [queryGetExpense?.isSuccess, queryGetExpense?.data, isEditMode]);
 
   const currency = getCurrencySymbol(trip?.currency);
   const equalShare = expenseData.amount
@@ -191,6 +331,14 @@ const AddExpense = () => {
     expenseData.amount && paidForMembers.length > 0
       ? (parseFloat(expenseData.amount) / paidForMembers.length).toFixed(2)
       : "0.00";
+
+  if (
+    (isEditMode && (queryGetExpense.isLoading || queryGetExpense.isFetching)) ||
+    queryTripDetail?.isLoading ||
+    queryTripDetail?.isFetching
+  ) {
+    return <AddExpenseSkeleton />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
@@ -476,7 +624,19 @@ const AddExpense = () => {
                   ))}
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                  {/* Total Expense Amount */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">
+                      Total Expense
+                    </span>
+                    <span className="text-lg font-bold text-gray-800">
+                      {currency}
+                      {parseFloat(expenseData.amount || 0).toFixed(2)}
+                    </span>
+                  </div>
+
+                  {/* Total Split Amount */}
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700">
                       Total Split Amount
@@ -494,14 +654,69 @@ const AddExpense = () => {
                       {calculateTotal().toFixed(2)}
                     </span>
                   </div>
+
+                  {/* Remaining Amount */}
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200">
+                    <div className="flex items-center gap-2">
+                      <Calculator className="text-purple-600" size={18} />
+                      <span className="text-sm font-semibold text-purple-800">
+                        Remaining to Split
+                      </span>
+                    </div>
+                    <span
+                      className={`text-xl font-bold ${
+                        Math.abs(
+                          parseFloat(expenseData.amount || 0) - calculateTotal()
+                        ) < 0.01
+                          ? "text-green-600"
+                          : parseFloat(expenseData.amount || 0) -
+                              calculateTotal() >
+                            0
+                          ? "text-orange-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {currency}
+                      {Math.abs(
+                        parseFloat(expenseData.amount || 0) - calculateTotal()
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+
+                  {/* Validation Messages */}
                   {expenseData.amount &&
                     Math.abs(
                       calculateTotal() - parseFloat(expenseData.amount)
                     ) > 0.01 && (
-                      <p className="text-xs text-red-600 mt-2 text-center">
-                        ⚠️ Split amounts must equal {currency}
-                        {parseFloat(expenseData.amount).toFixed(2)}
-                      </p>
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-xs text-red-700 text-center font-medium">
+                          ⚠️ Split amounts must equal {currency}
+                          {parseFloat(expenseData.amount).toFixed(2)}
+                        </p>
+                        {parseFloat(expenseData.amount || 0) -
+                          calculateTotal() >
+                          0 && (
+                          <p className="text-xs text-red-600 text-center mt-1">
+                            Add {currency}
+                            {(
+                              parseFloat(expenseData.amount || 0) -
+                              calculateTotal()
+                            ).toFixed(2)}{" "}
+                            more
+                          </p>
+                        )}
+                        {parseFloat(expenseData.amount || 0) -
+                          calculateTotal() <
+                          0 && (
+                          <p className="text-xs text-red-600 text-center mt-1">
+                            Reduce by {currency}
+                            {(
+                              calculateTotal() -
+                              parseFloat(expenseData.amount || 0)
+                            ).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
                     )}
                 </div>
                 <p className="text-xs text-gray-500 mt-3 text-center">
