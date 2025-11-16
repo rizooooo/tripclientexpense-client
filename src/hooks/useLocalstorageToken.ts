@@ -1,43 +1,52 @@
 import type { AuthResponseDto } from "api";
 import { useState } from "react";
 
-const useLocalStorageToken = (key: string = "jwtToken") => {
-  // ✅ Initialize token from localStorage
-  const [token, setTokenState] = useState<string | null>(() => {
-    return localStorage.getItem(key);
-  });
+const AUTH_STORAGE_KEY = "user";
+const TOKEN_STORAGE_KEY = "jwtToken";
 
-  // ✅ Initialize currentUser from localStorage if present
+const useLocalStorageToken = () => {
+  // ✅ Initialize currentUser from localStorage
   const [currentUser, setCurrentUserState] = useState<AuthResponseDto | null>(
     () => {
-      const storedUser = localStorage.getItem("user");
+      const storedUser = localStorage.getItem(AUTH_STORAGE_KEY);
       return storedUser ? (JSON.parse(storedUser) as AuthResponseDto) : null;
     }
   );
 
   const setToken = (newToken: string) => {
-    localStorage.setItem(key, newToken);
-    setTokenState(newToken);
+    localStorage.setItem(TOKEN_STORAGE_KEY, newToken);
+    
+    // Also update in user object if it exists
+    const storedUser = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser);
+      parsed.token = newToken;
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(parsed));
+      setCurrentUserState(parsed);
+    }
   };
 
   const clearToken = () => {
-    localStorage.removeItem(key);
-    setTokenState(null);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    setCurrentUserState(null);
   };
 
   const setCurrentUser = (user: AuthResponseDto) => {
     setCurrentUserState(user);
-    localStorage.setItem("user", JSON.stringify(user));
+    // Store complete auth data including token and refreshToken
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    localStorage.setItem(TOKEN_STORAGE_KEY, user.token);
   };
 
   const onClearAll = () => {
     setCurrentUserState(null);
-    setTokenState(null);
-    localStorage.clear();
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
   };
 
   return {
-    token,
+    token: currentUser?.token || null,
     setToken,
     clearToken,
     setCurrentUser,

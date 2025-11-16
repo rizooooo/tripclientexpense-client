@@ -8,12 +8,14 @@ import {
   Hash,
   TrendingDown,
   DollarSign,
+  Archive,
 } from "lucide-react";
 
 import { useQuery } from "@tanstack/react-query";
 import useApi from "@/hooks/useApi";
 import { formatDateRange } from "@/utils/date";
 import { getCurrencySymbol } from "@/lib/utils";
+import PullToRefresh from "@/components/PullToRefresh";
 
 const Home = () => {
   const { trip } = useApi();
@@ -31,6 +33,10 @@ const Home = () => {
   const trips = queryDashboard?.data?.recentTrips || [];
 
   const dashboard = queryDashboard?.data;
+
+  const handleRefresh = async () => {
+    await queryDashboard.refetch();
+  };
 
   if (
     queryDashboard?.isLoading ||
@@ -105,14 +111,15 @@ const Home = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 pb-8">
-        <h1 className="text-2xl font-bold mb-2">My Trips</h1>
-        <p className="text-blue-100 text-sm">
-          Split expenses with friends & family
-        </p>
-      </div>
+    <PullToRefresh onRefresh={handleRefresh}>
+      <div className="min-h-screen bg-gray-50 pb-20">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 pb-8">
+          <h1 className="text-2xl font-bold mb-2">My Trips</h1>
+          <p className="text-blue-100 text-sm">
+            Split expenses with friends & family
+          </p>
+        </div>
 
       {/* ⭐ Multi-Currency Balance Cards */}
       <div className="px-4 -mt-4 mb-4 space-y-3">
@@ -264,6 +271,17 @@ const Home = () => {
             ))}
           </div>
         )}
+
+        {/* View Archived Trips Link */}
+        <div className="mt-4">
+          <button
+            onClick={() => history.push("/trips/archived")}
+            className="w-full bg-gray-50 text-gray-600 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium hover:bg-gray-100 active:bg-gray-200 transition border border-gray-200"
+          >
+            <Archive size={18} />
+            View Archived Trips
+          </button>
+        </div>
       </div>
 
       {/* Bottom Navigation */}
@@ -289,7 +307,7 @@ const Home = () => {
           </button>
         </div>
       </div>
-    </div>
+    </PullToRefresh>
   );
 };
 

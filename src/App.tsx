@@ -12,6 +12,7 @@ import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import JoinTrip from "./pages/JoinTrip";
+import ArchivedTrips from "./pages/ArchivedTrips";
 
 import AuthProvider from "./providers/AuthProvider";
 import PrivateRoute from "./components/PrivateRoute";
@@ -32,6 +33,7 @@ function App() {
             {/* Protected routes */}
             <PrivateRoute exact path="/" component={Home} />
             <PrivateRoute exact path="/join/:token" component={JoinTrip} />
+            <PrivateRoute exact path="/trips/archived" component={ArchivedTrips} />
             <PrivateRoute exact path="/trips/create" component={CreateTrip} />
             <PrivateRoute exact path="/trips/edit/:tripId" component={CreateTrip} />
             <PrivateRoute exact path="/trips/:tripId" component={TripDetail} />

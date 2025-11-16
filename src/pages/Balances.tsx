@@ -8,6 +8,7 @@ import useApi from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton"; // 👈 make sure you have this component
 import { getCurrencySymbol } from "@/lib/utils";
+import PullToRefresh from "@/components/PullToRefresh";
 
 const Balances = () => {
   const history = useHistory();
@@ -32,8 +33,13 @@ const Balances = () => {
     },
   });
 
+  const handleRefresh = async () => {
+    await queryBalance.refetch();
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-6">
+    <PullToRefresh onRefresh={handleRefresh}>
+      <div className="min-h-screen bg-gray-50 pb-6">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 pb-6">
         <div className="flex items-center gap-3 mb-4">
@@ -186,7 +192,8 @@ const Balances = () => {
           )}
         </div>
       </div> */}
-    </div>
+      </div>
+    </PullToRefresh>
   );
 };
 

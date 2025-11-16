@@ -18,30 +18,47 @@ import { formatInTimeZone, toZonedTime } from "date-fns-tz";
  *  - Oct 20-22, 2025
  *  - Sep 30 - Oct 2, 2025
  *  - Dec 30, 2025 - Jan 2, 2026
+ *  - "Ongoing" if no dates provided
  */
-export function formatDateRange(startDate?: Date, endDate?: Date): string {
-  if (!(startDate instanceof Date) || !(endDate instanceof Date)) {
-    throw new Error("Both startDate and endDate must be valid Date objects.");
+export function formatDateRange(startDate?: Date | string | null, endDate?: Date | string | null): string {
+  // Handle null, undefined, or invalid dates
+  if (!startDate && !endDate) {
+    return "Ongoing";
   }
 
-  const sameMonth = isSameMonth(startDate, endDate);
-  const sameYear = isSameYear(startDate, endDate);
+  // Parse dates if they are strings
+  const start = startDate ? (typeof startDate === 'string' ? new Date(startDate) : startDate) : null;
+  const end = endDate ? (typeof endDate === 'string' ? new Date(endDate) : endDate) : null;
+
+  // Handle partial date ranges
+  if (!start && end && end instanceof Date && !isNaN(end.getTime())) {
+    return `Until ${format(end, "MMM d, yyyy")}`;
+  }
+
+  if (start && start instanceof Date && !isNaN(start.getTime()) && !end) {
+    return `From ${format(start, "MMM d, yyyy")}`;
+  }
+
+  // Both dates must be valid Date objects
+  if (!(start instanceof Date) || !(end instanceof Date) || isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return "Ongoing";
+  }
+
+  const sameMonth = isSameMonth(start, end);
+  const sameYear = isSameYear(start, end);
 
   if (sameMonth && sameYear) {
     // Example: Oct 20-22, 2025
-    return `${format(startDate, "MMM d")}-${format(endDate, "d, yyyy")}`;
+    return `${format(start, "MMM d")}-${format(end, "d, yyyy")}`;
   }
 
   if (sameYear) {
     // Example: Sep 30 - Oct 2, 2025
-    return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d, yyyy")}`;
+    return `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`;
   }
 
   // Example: Dec 30, 2025 - Jan 2, 2026
-  return `${format(startDate, "MMM d, yyyy")} - ${format(
-    endDate,
-    "MMM d, yyyy"
-  )}`;
+  return `${format(start, "MMM d, yyyy")} - ${format(end, "MMM d, yyyy")}`;
 }
 
 /**

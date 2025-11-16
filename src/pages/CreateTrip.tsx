@@ -161,6 +161,7 @@ const CreateTrip = () => {
                 : history.replace("/")
             }
             className="text-gray-600 active:text-gray-800"
+            aria-label="Go back"
           >
             <ArrowLeft size={24} />
           </button>
@@ -248,7 +249,7 @@ const CreateTrip = () => {
                   name="startDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Start Date *</FormLabel>
+                      <FormLabel>Start Date (Optional)</FormLabel>
                       <FormControl>
                         <Input
                           type="date"
@@ -256,10 +257,13 @@ const CreateTrip = () => {
                             field.value ? format(field.value, "yyyy-MM-dd") : ""
                           }
                           onChange={(e) =>
-                            field.onChange(new Date(e.target.value))
+                            field.onChange(e.target.value ? new Date(e.target.value) : undefined)
                           }
                         />
                       </FormControl>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Leave empty for ongoing groups
+                      </p>
                     </FormItem>
                   )}
                 />
@@ -268,7 +272,7 @@ const CreateTrip = () => {
                   name="endDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>End Date *</FormLabel>
+                      <FormLabel>End Date (Optional)</FormLabel>
                       <FormControl>
                         <Input
                           type="date"
@@ -276,10 +280,13 @@ const CreateTrip = () => {
                             field.value ? format(field.value, "yyyy-MM-dd") : ""
                           }
                           onChange={(e) =>
-                            field.onChange(new Date(e.target.value))
+                            field.onChange(e.target.value ? new Date(e.target.value) : undefined)
                           }
                         />
                       </FormControl>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Can be updated later
+                      </p>
                     </FormItem>
                   )}
                 />
@@ -293,11 +300,14 @@ const CreateTrip = () => {
                     <FormLabel>Description (Optional)</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="What's this trip about?"
+                        placeholder="e.g., Summer vacation with friends, Weekly groceries, Monthly expenses..."
                         rows={3}
                         {...field}
                       />
                     </FormControl>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Help others understand what this trip is about
+                    </p>
                   </FormItem>
                 )}
               />

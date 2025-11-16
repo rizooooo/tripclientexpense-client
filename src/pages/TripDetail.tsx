@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useHistory, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -14,18 +14,21 @@ import {
   PencilLine,
   ChevronRight,
   Users,
+  Archive,
+  Info,
 } from "lucide-react";
 import useApi from "@/hooks/useApi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   formatDateRange,
   formatRelativeDate,
-  formatSmartDate,
 } from "@/utils/date";
 import toast from "react-hot-toast";
 import copy from "copy-to-clipboard";
 import { useAuth } from "@/context/AuthContext";
 import { getCurrencySymbol } from "@/lib/utils";
+import PullToRefresh from "@/components/PullToRefresh";
+import type { TripMemberDto, ExpenseDto } from "api";
 
 const getSplitLabel = (splitType: string, splitCount: number) => {
   switch (splitType) {
@@ -117,6 +120,7 @@ const TripDetail = () => {
   const history = useHistory();
   const queryClient = useQueryClient();
   const [showMembers, setShowMembers] = useState(false);
+  const [showDescription, setShowDescription] = useState(false);
   const { trip: tripApi, expense } = useApi();
   const { tripId } = useParams<{ tripId: string }>();
 
@@ -175,7 +179,7 @@ const TripDetail = () => {
   const mutationDelete = useMutation({
     onSuccess: () => {
       toast.success("Trip deleted successfully");
-      queryClient.invalidateQueries(["getTrips"]);
+      queryClient.invalidateQueries({ queryKey: ["getTrips"] });
       history.replace("/");
     },
     onError: () => {
@@ -186,24 +190,48 @@ const TripDetail = () => {
     },
   });
 
+  const mutationArchive = useMutation({
+    onSuccess: () => {
+      toast.success("Trip archived successfully");
+      queryClient.invalidateQueries({ queryKey: ["getDashboardTotalShare"] });
+      queryClient.invalidateQueries({ queryKey: [`getTripDetail`, { tripId }] });
+      setShowMenu(false);
+      history.replace("/");
+    },
+    onError: () => {
+      toast.error("Failed to archive trip");
+    },
+    mutationFn: async () => {
+      const basePath = import.meta.env.VITE_API;
+      const token = currentAuth?.token;
+      const response = await fetch(`${basePath}/api/Trips/${tripId}/archive`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to archive trip");
+      }
+      return response.json();
+    },
+  });
+
   const handleShare = () => {
     mutationShare.mutate();
-  };
-
-  const handleCopyLink = () => {
-    copy(inviteLink);
-    setCopied(true);
-    toast.success("Link copied to clipboard!");
-
-    // Reset copied state after 2 seconds
-    setTimeout(() => {
-      setCopied(false);
-    }, 2000);
   };
 
   const handleDeleteConfirm = () => {
     mutationDelete.mutate();
     setShowDeleteModal(false);
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      queryTripDetail.refetch(),
+      queryExpenses.refetch(),
+    ]);
   };
 
   // Show skeleton while loading
@@ -219,13 +247,15 @@ const TripDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 pb-6">
+    <PullToRefresh onRefresh={handleRefresh}>
+      <div className="min-h-screen bg-gray-50 pb-20">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 pb-6">
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={() => history.replace("/")}
             className="text-white active:text-blue-100"
+            aria-label="Go back to home"
           >
             <ArrowLeft size={24} />
           </button>
@@ -241,6 +271,7 @@ const TripDetail = () => {
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="p-2 active:bg-white/20 rounded-lg transition"
+              aria-label="Open menu"
             >
               <MoreVertical size={20} />
             </button>
@@ -280,6 +311,22 @@ const TripDetail = () => {
                   >
                     <PencilLine size={18} className="text-gray-600" />
                     <span className="text-gray-800 font-medium">Edit Trip</span>
+                  </button>
+
+                  <div className="border-t border-gray-100 my-1" />
+
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      mutationArchive.mutate();
+                    }}
+                    disabled={mutationArchive.isPending}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 active:bg-gray-100 transition flex items-center gap-3 disabled:opacity-50"
+                  >
+                    <Archive size={18} className="text-gray-600" />
+                    <span className="text-gray-800 font-medium">
+                      {mutationArchive.isPending ? "Archiving..." : "Archive Trip"}
+                    </span>
                   </button>
 
                   <div className="border-t border-gray-100 my-1" />
@@ -342,7 +389,7 @@ const TripDetail = () => {
           {/* Member Avatars Preview */}
           <div className="flex items-center gap-2">
             <div className="flex -space-x-2">
-              {trip?.members?.slice(0, 3).map((member, index) => (
+              {trip?.members?.slice(0, 3).map((member: TripMemberDto, index: number) => (
                 <div
                   key={member.id}
                   className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-semibold border-2 border-white"
@@ -369,7 +416,7 @@ const TripDetail = () => {
         {/* Expandable Members List */}
         {showMembers && (
           <div className="mt-2 bg-white rounded-xl shadow-md overflow-hidden animate-slide-down">
-            {trip?.members?.map((member) => (
+            {trip?.members?.map((member: TripMemberDto) => (
               <div
                 key={member.id}
                 onClick={() =>
@@ -394,6 +441,43 @@ const TripDetail = () => {
           </div>
         )}
       </div>
+
+      {/* Trip Description Section - Only show if description exists */}
+      {trip?.description && (
+        <div className="px-4 mb-4">
+          <button
+            onClick={() => setShowDescription(!showDescription)}
+            className="w-full bg-white rounded-xl shadow-md p-4 flex items-center justify-between hover:shadow-lg transition active:scale-98"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-100 p-2 rounded-lg">
+                <Info className="text-blue-600" size={20} />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-gray-800">About this trip</p>
+                <p className="text-xs text-gray-500">
+                  {showDescription ? "Hide" : "Show"} description
+                </p>
+              </div>
+            </div>
+            <ChevronRight
+              className={`text-gray-400 transition-transform ${
+                showDescription ? "rotate-90" : ""
+              }`}
+              size={20}
+            />
+          </button>
+
+          {/* Expandable Description */}
+          {showDescription && (
+            <div className="mt-2 bg-white rounded-xl shadow-md p-4 animate-slide-down">
+              <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                {trip.description}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="bg-white border-b border-gray-200 px-4 flex gap-6 sticky top-0 z-10">
@@ -467,7 +551,7 @@ const TripDetail = () => {
           </div>
         ) : (
           expenses &&
-          expenses?.map((expense) => (
+          expenses?.map((expense: ExpenseDto) => (
             <div
               key={expense.id}
               onClick={() => {
@@ -498,7 +582,7 @@ const TripDetail = () => {
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-gray-800">
-                    {getCurrencySymbol(expense?.currency!)}
+                    {expense?.currency && getCurrencySymbol(expense.currency)}
                     {expense.amount}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -541,6 +625,7 @@ const TripDetail = () => {
                   setCopied(false);
                 }}
                 className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 active:text-gray-800"
+                aria-label="Close invite modal"
               >
                 <X size={24} />
               </button>
@@ -686,6 +771,7 @@ const TripDetail = () => {
               <button
                 onClick={() => setShowDeleteModal(false)}
                 className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 active:text-gray-800"
+                aria-label="Close delete modal"
               >
                 <X size={24} />
               </button>
@@ -748,7 +834,8 @@ const TripDetail = () => {
           </div>
         </>
       )}
-    </div>
+      </div>
+    </PullToRefresh>
   );
 };
 
