@@ -16,6 +16,7 @@ import {
   Users,
   Archive,
   Info,
+  CreditCard,
 } from "lucide-react";
 import useApi from "@/hooks/useApi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -153,9 +154,29 @@ const TripDetail = () => {
     enabled: !!tripId,
   });
 
+  const queryMyExpenses = useQuery({
+    queryKey: [`getMyExpensesTripDetail`, { tripId }],
+    queryFn: async () => {
+      const response =
+        await expense.apiExpensesMemberUserIdTripTripIdBreakdownGet({
+          tripId: parseInt(tripId),
+          userId: currentAuth?.userId,
+          myExpensesOnly: true,
+        });
+      return response;
+    },
+    enabled: !!tripId && !!currentAuth?.userId && activeTab === "myExpenses",
+  });
+
   const trip = queryTripDetail?.data;
   const expenses = queryExpenses?.data || [];
+  const myExpensesData = queryMyExpenses?.data;
 
+  const totalMyExpenses =
+    myExpensesData?.transactions?.reduce(
+      (sum, t) => sum + (t.totalExpenseAmount || 0),
+      0
+    ) || 0;
   const mutationShare = useMutation({
     onSuccess: (response) => {
       setInviteLink(response?.inviteLink || "");
@@ -571,37 +592,23 @@ const TripDetail = () => {
           >
             Balances
           </button>
+          <button
+            onClick={() => setActiveTab("myExpenses")}
+            className={`py-3 font-medium text-sm relative ${
+              activeTab === "myExpenses" ? "text-blue-600" : "text-gray-500"
+            }`}
+          >
+            My Expenses
+            {activeTab === "myExpenses" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+            )}
+          </button>
         </div>
-
-        {/* Add Expense Button - HIDDEN IF ARCHIVED */}
-        {trip && expenses.length > 0 && !trip?.isArchived && (
-          <div className="px-4 mt-4">
-            <button
-              onClick={() =>
-                history.push({
-                  pathname: `/trips/${tripId}/expenses/add`,
-                  state: {
-                    members: queryTripDetail?.data?.members,
-                    trip,
-                  },
-                })
-              }
-              className="w-full bg-blue-600 text-white py-3 rounded-lg flex items-center justify-center gap-2 font-medium hover:bg-blue-700 active:bg-blue-800 transition"
-            >
-              <Plus size={20} />
-              Add Expense
-            </button>
-          </div>
-        )}
-
-        {/* Expenses List */}
-        <div className="px-4 mt-4 space-y-3 pb-4">
-          {expenses.length === 0 ? (
-            <div className="bg-white rounded-xl p-8 text-center shadow-sm border border-gray-200">
-              <Receipt className="mx-auto text-gray-300 mb-3" size={48} />
-              <p className="text-gray-500 mb-4">No expenses yet</p>
-              {/* Add First Expense Button - HIDDEN IF ARCHIVED */}
-              {!trip?.isArchived && (
+        {activeTab === "expenses" && (
+          <>
+            {/* Add Expense Button - HIDDEN IF ARCHIVED */}
+            {trip && expenses.length > 0 && !trip?.isArchived && (
+              <div className="px-4 mt-4">
                 <button
                   onClick={() =>
                     history.push({
@@ -612,69 +619,221 @@ const TripDetail = () => {
                       },
                     })
                   }
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium"
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg flex items-center justify-center gap-2 font-medium hover:bg-blue-700 active:bg-blue-800 transition"
                 >
-                  Add First Expense
+                  <Plus size={20} />
+                  Add Expense
                 </button>
-              )}
-            </div>
-          ) : (
-            expenses &&
-            expenses?.map((expense: ExpenseDto) => (
-              <div
-                key={expense.id}
-                onClick={() => {
-                  if (
-                    expense?.paidByUserId === currentAuth?.userId &&
-                    !trip?.isArchived
-                  ) {
-                    history.push({
-                      pathname: `/trips/${tripId}/expenses/${expense.id}/edit`,
-                      state: {
-                        members: queryTripDetail?.data?.members,
-                      },
-                    });
-                  }
-                }}
-                className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 active:bg-gray-50 transition"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-blue-100 p-2 rounded-lg">
-                      <Receipt className="text-blue-600" size={20} />
+              </div>
+            )}
+
+            {/* Expenses List */}
+            <div className="px-4 mt-4 space-y-3 pb-4">
+              {expenses.length === 0 ? (
+                <div className="bg-white rounded-xl p-8 text-center shadow-sm border border-gray-200">
+                  <Receipt className="mx-auto text-gray-300 mb-3" size={48} />
+                  <p className="text-gray-500 mb-4">No expenses yet</p>
+                  {/* Add First Expense Button - HIDDEN IF ARCHIVED */}
+                  {!trip?.isArchived && (
+                    <button
+                      onClick={() =>
+                        history.push({
+                          pathname: `/trips/${tripId}/expenses/add`,
+                          state: {
+                            members: queryTripDetail?.data?.members,
+                            trip,
+                          },
+                        })
+                      }
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium"
+                    >
+                      Add First Expense
+                    </button>
+                  )}
+                </div>
+              ) : (
+                expenses &&
+                expenses?.map((expense: ExpenseDto) => (
+                  <div
+                    key={expense.id}
+                    onClick={() => {
+                      if (
+                        expense?.paidByUserId === currentAuth?.userId &&
+                        !trip?.isArchived
+                      ) {
+                        history.push({
+                          pathname: `/trips/${tripId}/expenses/${expense.id}/edit`,
+                          state: {
+                            members: queryTripDetail?.data?.members,
+                          },
+                        });
+                      }
+                    }}
+                    className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 active:bg-gray-50 transition"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-blue-100 p-2 rounded-lg">
+                          <Receipt className="text-blue-600" size={20} />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-800">
+                            {expense?.description}
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            {formatRelativeDate(expense?.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-gray-800">
+                          {expense?.currency &&
+                            getCurrencySymbol(expense.currency)}
+                          {expense.amount}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {getSplitLabel(
+                            expense?.splitType,
+                            expense.splitCount
+                          )}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-800">
-                        {expense?.description}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {formatRelativeDate(expense?.createdAt)}
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                      <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-xs font-semibold text-green-700">
+                        {expense?.paidByName?.[0]}
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">
+                          {expense.paidByName}
+                        </span>{" "}
+                        paid
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-gray-800">
-                      {expense?.currency && getCurrencySymbol(expense.currency)}
-                      {expense.amount}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {getSplitLabel(expense?.splitType, expense.splitCount)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                  <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-xs font-semibold text-green-700">
-                    {expense?.paidByName?.[0]}
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    <span className="font-medium">{expense.paidByName}</span>{" "}
-                    paid
+                ))
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === "myExpenses" && (
+          <div className="px-4 mt-4 space-y-4 pb-4">
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border-2 border-blue-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-xs uppercase tracking-wide font-semibold mb-1">
+                    Total You Paid
+                  </p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {myExpensesData?.transactions?.length || 0} transactions
                   </p>
                 </div>
+                <p className="text-4xl font-bold text-blue-600">
+                  {getCurrencySymbol(trip?.currency)}
+                  {totalMyExpenses.toFixed(2)}
+                </p>
               </div>
-            ))
-          )}
-        </div>
+            </div>
+
+            <div className="space-y-3">
+              {myExpensesData?.transactions?.length === 0 ? (
+                <div className="bg-white rounded-xl p-8 text-center shadow-sm border border-gray-200">
+                  <Receipt className="mx-auto text-gray-300 mb-3" size={48} />
+                  <p className="text-gray-500">
+                    You haven't paid any expenses yet
+                  </p>
+                </div>
+              ) : (
+                myExpensesData?.transactions?.map((transaction) => {
+                  const isExpense = transaction.type === "Expense";
+                  const isPayment = transaction.type === "Payment";
+
+                  return (
+                    <div
+                      key={`${transaction.type}-${transaction.transactionId}`}
+                    >
+                      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-start gap-3 flex-1">
+                            <div
+                              className={`p-2 rounded-lg ${
+                                isExpense
+                                  ? "bg-blue-100"
+                                  : isPayment
+                                  ? "bg-green-100"
+                                  : "bg-purple-100"
+                              }`}
+                            >
+                              {isExpense ? (
+                                <Receipt className="text-blue-600" size={18} />
+                              ) : (
+                                <CreditCard
+                                  className="text-green-600"
+                                  size={18}
+                                />
+                              )}
+                            </div>
+
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-semibold text-gray-800">
+                                  {transaction.description}
+                                </p>
+                                <span
+                                  className={`text-xs px-2 py-0.5 rounded-full ${
+                                    isExpense
+                                      ? "bg-blue-100 text-blue-600"
+                                      : isPayment
+                                      ? "bg-green-100 text-green-600"
+                                      : "bg-purple-100 text-purple-600"
+                                  }`}
+                                >
+                                  {transaction.type}
+                                </span>
+                              </div>
+
+                              <p className="text-xs text-gray-500">
+                                {formatRelativeDate(transaction?.date)}
+                              </p>
+
+                              {isExpense && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  You paid • Total:{" "}
+                                  {getCurrencySymbol(trip?.currency)}
+                                  {transaction.totalExpenseAmount?.toFixed(2)}
+                                </p>
+                              )}
+
+                              {isPayment && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  You paid • Settlement
+                                </p>
+                              )}
+
+                              {transaction.notes && (
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {transaction.notes}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-right ml-3">
+                            <p className="text-lg font-bold text-gray-800">
+                              {getCurrencySymbol(trip?.currency)}
+                              {transaction.totalExpenseAmount?.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Invite Modal */}
         {showInviteModal && (
