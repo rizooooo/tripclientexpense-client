@@ -145,17 +145,17 @@ const TripDetail = () => {
   const isArchived = queryTripDetail?.data?.isArchived;
 
   const queryExpenses = useQuery({
-    queryKey: [`getTripExpenses`, { tripId }],
+    queryKey: [`getTripExpenses`, { tripId, activeTab: activeTab }],
     queryFn: async () => {
       const response = await expense.apiExpensesGet({ tripId: +tripId });
 
       return response;
     },
-    enabled: !!tripId,
+    enabled: !!tripId && activeTab === "expenses",
   });
 
   const queryMyExpenses = useQuery({
-    queryKey: [`getMyExpensesTripDetail`, { tripId }],
+    queryKey: [`getMyExpensesTripDetail`, { tripId, activeTab }],
     queryFn: async () => {
       const response =
         await expense.apiExpensesMemberUserIdTripTripIdBreakdownGet({
