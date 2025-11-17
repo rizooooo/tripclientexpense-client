@@ -6,8 +6,6 @@ import {
   ExpensesApi,
   SettlementsApi,
   AuthApi,
-  Middleware,
-  ResponseContext,
 } from "api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -38,99 +36,105 @@ const useApi = () => {
   // Create configuration with dynamic token and middleware
   const config = useMemo(() => {
     // Create middleware for token refresh
-    const refreshTokenMiddleware: Middleware = {
-      post: async (context: ResponseContext): Promise<Response | void> => {
-      const { response, init } = context;
+    const refreshTokenMiddleware = {
+      post: async (context): Promise<Response | void> => {
+        const { response, init } = context;
 
-      // Check if response is 401 Unauthorized
-      if (response.status === 401) {
-        const originalUrl = context.url;
-        const originalInit = init;
+        // Check if response is 401 Unauthorized
+        if (response.status === 401) {
+          const originalUrl = context.url;
+          const originalInit = init;
 
-        // Don't retry if it's the refresh endpoint itself or login/register
-        if (
-          originalUrl.includes("/Auth/refresh") ||
-          originalUrl.includes("/Auth/login") ||
-          originalUrl.includes("/Auth/register")
-        ) {
-          return response;
-        }
-
-        // If already refreshing, queue this request
-        if (isRefreshing) {
-          return new Promise((resolve, reject) => {
-            failedQueue.push({ resolve, reject });
-          })
-            .then((newToken) => {
-              // Retry with new token
-              const newHeaders = new Headers(originalInit?.headers);
-              newHeaders.set("Authorization", `Bearer ${newToken}`);
-              return fetch(originalUrl, { ...originalInit, headers: newHeaders });
-            })
-            .catch((err) => {
-              throw err;
-            });
-        }
-
-        isRefreshing = true;
-
-        const storedUser = localStorage.getItem("user");
-        if (!storedUser) {
-          isRefreshing = false;
-          logout();
-          window.location.href = "/login";
-          return response;
-        }
-
-        const authData = JSON.parse(storedUser);
-        if (!authData.refreshToken) {
-          isRefreshing = false;
-          logout();
-          window.location.href = "/login";
-          return response;
-        }
-
-        try {
-          // Call refresh endpoint
-          const refreshResponse = await fetch(`${basePath}/api/Auth/refresh`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              refreshToken: authData.refreshToken,
-            }),
-          });
-
-          if (!refreshResponse.ok) {
-            throw new Error("Refresh failed");
+          // Don't retry if it's the refresh endpoint itself or login/register
+          if (
+            originalUrl.includes("/Auth/refresh") ||
+            originalUrl.includes("/Auth/login") ||
+            originalUrl.includes("/Auth/register")
+          ) {
+            return response;
           }
 
-          const newAuthData = await refreshResponse.json();
+          // If already refreshing, queue this request
+          if (isRefreshing) {
+            return new Promise((resolve, reject) => {
+              failedQueue.push({ resolve, reject });
+            })
+              .then((newToken) => {
+                // Retry with new token
+                const newHeaders = new Headers(originalInit?.headers);
+                newHeaders.set("Authorization", `Bearer ${newToken}`);
+                return fetch(originalUrl, {
+                  ...originalInit,
+                  headers: newHeaders,
+                });
+              })
+              .catch((err) => {
+                throw err;
+              });
+          }
 
-          // Update session with new tokens
-          setSession(newAuthData);
+          isRefreshing = true;
 
-          // Process queued requests with new token
-          processQueue(null, newAuthData.token);
+          const storedUser = localStorage.getItem("user");
+          if (!storedUser) {
+            isRefreshing = false;
+            logout();
+            window.location.href = "/login";
+            return response;
+          }
 
-          isRefreshing = false;
+          const authData = JSON.parse(storedUser);
+          if (!authData.refreshToken) {
+            isRefreshing = false;
+            logout();
+            window.location.href = "/login";
+            return response;
+          }
 
-          // Retry original request with new token
-          const newHeaders = new Headers(originalInit?.headers);
-          newHeaders.set("Authorization", `Bearer ${newAuthData.token}`);
-          return fetch(originalUrl, { ...originalInit, headers: newHeaders });
-        } catch (error) {
-          // Refresh failed, clear auth and redirect to login
-          processQueue(error, null);
-          isRefreshing = false;
-          logout();
-          window.location.href = "/login";
-          return response;
+          try {
+            // Call refresh endpoint
+            const refreshResponse = await fetch(
+              `${basePath}/api/Auth/refresh`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  refreshToken: authData.refreshToken,
+                }),
+              }
+            );
+
+            if (!refreshResponse.ok) {
+              throw new Error("Refresh failed");
+            }
+
+            const newAuthData = await refreshResponse.json();
+
+            // Update session with new tokens
+            setSession(newAuthData);
+
+            // Process queued requests with new token
+            processQueue(null, newAuthData.token);
+
+            isRefreshing = false;
+
+            // Retry original request with new token
+            const newHeaders = new Headers(originalInit?.headers);
+            newHeaders.set("Authorization", `Bearer ${newAuthData.token}`);
+            return fetch(originalUrl, { ...originalInit, headers: newHeaders });
+          } catch (error) {
+            // Refresh failed, clear auth and redirect to login
+            processQueue(error, null);
+            isRefreshing = false;
+            logout();
+            window.location.href = "/login";
+            return response;
+          }
         }
-      }
 
-      return response;
+        return response;
       },
     };
 

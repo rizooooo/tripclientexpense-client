@@ -7,6 +7,7 @@ import {
   TrendingDown,
   TrendingUp,
   X,
+  LockIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import useApi from "@/hooks/useApi";
@@ -193,15 +194,27 @@ const MemberDetail = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 pb-8">
+      {/* Header - Conditional Styling */}
+      <div
+        className={
+          breakdown?.isArchived
+            ? "bg-gradient-to-r from-gray-600 to-gray-700 text-white p-4 pb-8" // Archived style
+            : "bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 pb-8" // Default style
+        }
+      >
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => history.replace(`/trips/${tripId}`)}
-            className="text-white active:text-blue-100"
+            className={
+              breakdown?.isArchived
+                ? "text-white active:text-gray-100"
+                : "text-white active:text-blue-100"
+            }
           >
             <ArrowLeft size={24} />
           </button>
           <h1 className="text-xl font-semibold">Member Details</h1>
+          {/* Optional: Add an "Archived" badge here if desired */}
         </div>
 
         <div className="flex flex-col items-center">
@@ -209,12 +222,17 @@ const MemberDetail = () => {
             {breakdown.userAvatar}
           </div>
           <h2 className="text-2xl font-bold mb-1">{breakdown.userName}</h2>
+          {/* Balance Text - Conditional Text Color */}
           <p
             className={`text-3xl font-bold mb-2 ${
               isOwing
-                ? "text-red-200"
+                ? breakdown?.isArchived
+                  ? "text-red-300"
+                  : "text-red-200"
                 : isGettingBack
-                ? "text-green-200"
+                ? breakdown?.isArchived
+                  ? "text-green-300"
+                  : "text-green-200"
                 : "text-white"
             }`}
           >
@@ -222,7 +240,16 @@ const MemberDetail = () => {
             {currency}
             {Math.abs(netBalance).toFixed(2)}
           </p>
-          <p className="text-blue-100 text-sm">in {breakdown.tripName}</p>
+          {/* Trip Name Text - Conditional Text Color */}
+          <p
+            className={
+              breakdown?.isArchived
+                ? "text-gray-100 text-sm"
+                : "text-blue-100 text-sm"
+            }
+          >
+            in {breakdown.tripName}
+          </p>
         </div>
       </div>
 
@@ -253,8 +280,20 @@ const MemberDetail = () => {
           </div>
         </div>
 
-        {/* Action Buttons - Second, main CTA */}
-        {isOwing && (
+        {/* ARCHIVED MESSAGE - If trip is archived, show a message instead of buttons */}
+        {breakdown?.isArchived && (
+          <div className="bg-gray-100 border border-gray-300 rounded-xl p-4">
+            <div className="flex items-center justify-center gap-2">
+              <LockIcon size={20} className="text-gray-600" />
+              <p className="text-sm text-gray-700 font-medium">
+                This trip is archived. Settlements cannot be recorded.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons - HIDDEN IF ARCHIVED */}
+        {isOwing && !breakdown?.isArchived && (
           <div className="space-y-3">
             <button
               onClick={handleFullPayment}
@@ -432,8 +471,8 @@ const MemberDetail = () => {
           </div>
         </div>
       </div>
-      {/* Partial Payment Modal (Modal content remains unchanged) */}
-      {showPaymentModal && (
+      {/* Partial Payment Modal (HIDDEN IF breakdown?.isArchived, as it's only shown when buttons are clicked) */}
+      {showPaymentModal && !breakdown?.isArchived && (
         <>
           {/* Backdrop */}
           <div

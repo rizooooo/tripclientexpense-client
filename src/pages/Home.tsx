@@ -121,190 +121,193 @@ const Home = () => {
           </p>
         </div>
 
-      {/* ⭐ Multi-Currency Balance Cards */}
-      <div className="px-4 -mt-4 mb-4 space-y-3">
-        {dashboard?.currencyBalances?.length > 0 ? (
-          dashboard.currencyBalances.map((currencyBalance) => {
-            const balance = currencyBalance.balance;
-            const isPositive = balance > 0;
-            const isNegative = balance < 0;
+        {/* ⭐ Multi-Currency Balance Cards */}
+        <div className="px-4 -mt-4 mb-4 space-y-3">
+          {dashboard?.currencyBalances?.length > 0 ? (
+            dashboard.currencyBalances.map((currencyBalance) => {
+              const balance = currencyBalance.balance;
+              const isPositive = balance > 0;
+              const isNegative = balance < 0;
 
-            return (
-              <div
-                key={currencyBalance.currency}
-                className={`bg-white rounded-xl shadow-md p-4 border-l-4 ${
-                  isPositive
-                    ? "border-green-500"
-                    : isNegative
-                    ? "border-red-500"
-                    : "border-gray-500"
-                }`}
+              return (
+                <div
+                  key={currencyBalance.currency}
+                  className={`bg-white rounded-xl shadow-md p-4 border-l-4 ${
+                    isPositive
+                      ? "border-green-500"
+                      : isNegative
+                      ? "border-red-500"
+                      : "border-gray-500"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      {/* Currency Badge */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                          {currencyBalance.currency || "PHP"}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {currencyBalance.tripCount}{" "}
+                          {currencyBalance.tripCount === 1 ? "trip" : "trips"}
+                        </span>
+                      </div>
+
+                      <p className="text-gray-600 text-sm mb-1">Your Balance</p>
+                      <p
+                        className={`text-2xl font-bold ${
+                          isPositive
+                            ? "text-green-600"
+                            : isNegative
+                            ? "text-red-600"
+                            : "text-gray-600"
+                        }`}
+                      >
+                        {isPositive ? "+" : ""}
+                        {currencyBalance.currencySymbol || "₱"}
+                        {Math.abs(balance).toFixed(2)}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {isPositive
+                          ? "You are owed"
+                          : isNegative
+                          ? "You owe"
+                          : "All settled"}
+                      </p>
+                    </div>
+
+                    <div
+                      className={`p-3 rounded-full ${
+                        isPositive
+                          ? "bg-green-100"
+                          : isNegative
+                          ? "bg-red-100"
+                          : "bg-gray-100"
+                      }`}
+                    >
+                      {isPositive ? (
+                        <TrendingUp className="text-green-600" size={24} />
+                      ) : isNegative ? (
+                        <TrendingDown className="text-red-600" size={24} />
+                      ) : (
+                        <DollarSign className="text-gray-600" size={24} />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-gray-500">
+              <p className="text-gray-600 text-center">No trips yet</p>
+            </div>
+          )}
+        </div>
+
+        {/* Trips List */}
+        <div className="px-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-800">
+              Active Trips
+            </h2>
+            <button
+              onClick={() => history.push("/trips/create")}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-blue-700 active:bg-blue-800 transition"
+            >
+              <Plus size={18} />
+              New Trip
+            </button>
+          </div>
+
+          {trips.length === 0 ? (
+            <div className="bg-white rounded-xl p-8 text-center shadow-sm border border-gray-200">
+              <Receipt className="mx-auto text-gray-300 mb-3" size={48} />
+              <p className="text-gray-500 mb-4">No trips yet</p>
+              <button
+                onClick={() => history.push("/trips/create")}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    {/* Currency Badge */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                        {currencyBalance.currency || "PHP"}
+                Create Your First Trip
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {trips.map((trip) => (
+                <div
+                  key={trip.id}
+                  onClick={() => history.push(`/trips/${trip.id}`)}
+                  className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 active:bg-gray-50 transition"
+                >
+                  {/* TOP ROW: Trip Name and Currency Tag */}
+                  <div className="flex items-center justify-between mb-2">
+                    {/* Clean Trip Name */}
+                    <h3 className="font-semibold text-gray-800">{trip.name}</h3>
+
+                    {/* 🔹 NEW: Currency as a Tag (Clean and Visible) */}
+                    <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                      {trip.currency || "PHP"}
+                    </span>
+                    {/* <span className="text-gray-400">›</span> <-- Removed the arrow to make room for the tag, or move the arrow below */}
+                  </div>
+
+                  {/* BOTTOM ROW: Metadata and Total Expenses */}
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <span className="flex items-center gap-1">
+                        <Users size={16} />
+                        {trip.memberCount} members
                       </span>
-                      <span className="text-xs text-gray-500">
-                        {currencyBalance.tripCount}{" "}
-                        {currencyBalance.tripCount === 1 ? "trip" : "trips"}
+                      <span className="text-gray-400">•</span>
+                      <span>
+                        {formatDateRange(trip?.startDate, trip?.endDate)}
                       </span>
                     </div>
 
-                    <p className="text-gray-600 text-sm mb-1">Your Balance</p>
-                    <p
-                      className={`text-2xl font-bold ${
-                        isPositive
-                          ? "text-green-600"
-                          : isNegative
-                          ? "text-red-600"
-                          : "text-gray-600"
-                      }`}
-                    >
-                      {isPositive ? "+" : ""}
-                      {currencyBalance.currencySymbol || "₱"}
-                      {Math.abs(balance).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {isPositive
-                        ? "You are owed"
-                        : isNegative
-                        ? "You owe"
-                        : "All settled"}
-                    </p>
-                  </div>
-
-                  <div
-                    className={`p-3 rounded-full ${
-                      isPositive
-                        ? "bg-green-100"
-                        : isNegative
-                        ? "bg-red-100"
-                        : "bg-gray-100"
-                    }`}
-                  >
-                    {isPositive ? (
-                      <TrendingUp className="text-green-600" size={24} />
-                    ) : isNegative ? (
-                      <TrendingDown className="text-red-600" size={24} />
-                    ) : (
-                      <DollarSign className="text-gray-600" size={24} />
-                    )}
+                    {/* 🔹 NEW: Use the correct symbol for Total Expenses */}
+                    <span className="font-semibold text-gray-800">
+                      {getCurrencySymbol(trip.currency)}
+                      {trip.totalExpenses}
+                    </span>
                   </div>
                 </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-gray-500">
-            <p className="text-gray-600 text-center">No trips yet</p>
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
 
-      {/* Trips List */}
-      <div className="px-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-800">Active Trips</h2>
-          <button
-            onClick={() => history.push("/trips/create")}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-blue-700 active:bg-blue-800 transition"
-          >
-            <Plus size={18} />
-            New Trip
-          </button>
-        </div>
-
-        {trips.length === 0 ? (
-          <div className="bg-white rounded-xl p-8 text-center shadow-sm border border-gray-200">
-            <Receipt className="mx-auto text-gray-300 mb-3" size={48} />
-            <p className="text-gray-500 mb-4">No trips yet</p>
+          {/* View Archived Trips Link */}
+          <div className="mt-4">
             <button
-              onClick={() => history.push("/trips/create")}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium"
+              onClick={() => history.push("/trips/archived")}
+              className="w-full bg-gray-50 text-gray-600 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium hover:bg-gray-100 active:bg-gray-200 transition border border-gray-200"
             >
-              Create Your First Trip
+              <Archive size={18} />
+              View Archived Trips
             </button>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {trips.map((trip) => (
-              <div
-                key={trip.id}
-                onClick={() => history.push(`/trips/${trip.id}`)}
-                className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 active:bg-gray-50 transition"
-              >
-                {/* TOP ROW: Trip Name and Currency Tag */}
-                <div className="flex items-center justify-between mb-2">
-                  {/* Clean Trip Name */}
-                  <h3 className="font-semibold text-gray-800">{trip.name}</h3>
-
-                  {/* 🔹 NEW: Currency as a Tag (Clean and Visible) */}
-                  <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                    {trip.currency || "PHP"}
-                  </span>
-                  {/* <span className="text-gray-400">›</span> <-- Removed the arrow to make room for the tag, or move the arrow below */}
-                </div>
-
-                {/* BOTTOM ROW: Metadata and Total Expenses */}
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-3 text-gray-600">
-                    <span className="flex items-center gap-1">
-                      <Users size={16} />
-                      {trip.memberCount} members
-                    </span>
-                    <span className="text-gray-400">•</span>
-                    <span>
-                      {formatDateRange(trip?.startDate, trip?.endDate)}
-                    </span>
-                  </div>
-
-                  {/* 🔹 NEW: Use the correct symbol for Total Expenses */}
-                  <span className="font-semibold text-gray-800">
-                    {getCurrencySymbol(trip.currency)}
-                    {trip.totalExpenses}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* View Archived Trips Link */}
-        <div className="mt-4">
-          <button
-            onClick={() => history.push("/trips/archived")}
-            className="w-full bg-gray-50 text-gray-600 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium hover:bg-gray-100 active:bg-gray-200 transition border border-gray-200"
-          >
-            <Archive size={18} />
-            View Archived Trips
-          </button>
         </div>
-      </div>
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 px-6 py-3 bottom-nav-safe">
-        <div className="flex items-center justify-around">
-          <button className="flex flex-col items-center gap-1 text-blue-600">
-            <Receipt size={24} />
-            <span className="text-xs font-medium">Trips</span>
-          </button>
-          <button
-            onClick={() => history.push("/join")}
-            className="flex flex-col items-center gap-1 text-gray-400 active:text-gray-600"
-          >
-            <Hash size={24} />
-            <span className="text-xs">Join</span>
-          </button>
-          <button
-            onClick={() => history.push("/profile")}
-            className="flex flex-col items-center gap-1 text-gray-400 active:text-gray-600"
-          >
-            <User size={24} />
-            <span className="text-xs">Profile</span>
-          </button>
+        {/* Bottom Navigation */}
+        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 px-6 py-3 bottom-nav-safe">
+          <div className="flex items-center justify-around">
+            <button className="flex flex-col items-center gap-1 text-blue-600">
+              <Receipt size={24} />
+              <span className="text-xs font-medium">Trips</span>
+            </button>
+            <button
+              onClick={() => history.push("/join")}
+              className="flex flex-col items-center gap-1 text-gray-400 active:text-gray-600"
+            >
+              <Hash size={24} />
+              <span className="text-xs">Join</span>
+            </button>
+            <button
+              onClick={() => history.push("/profile")}
+              className="flex flex-col items-center gap-1 text-gray-400 active:text-gray-600"
+            >
+              <User size={24} />
+              <span className="text-xs">Profile</span>
+            </button>
+          </div>
         </div>
       </div>
     </PullToRefresh>

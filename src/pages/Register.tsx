@@ -94,7 +94,7 @@ const Register = () => {
     registerMutation.mutate();
   };
 
-  const isLoading = registerMutation.isLoading;
+  const isLoading = registerMutation.isPending;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-4">
