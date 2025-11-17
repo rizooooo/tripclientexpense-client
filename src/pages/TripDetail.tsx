@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useHistory, useParams } from "react-router-dom";
+import { useHistory, useLocation, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Plus,
@@ -116,13 +116,20 @@ const LoadingSkeleton = () => (
 
 const TripDetail = () => {
   const history = useHistory();
+  const { state } = useLocation<{
+    myExpenses: boolean;
+  }>();
+
+  const { myExpenses } = state || {};
   const queryClient = useQueryClient();
   const [showMembers, setShowMembers] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
   const { trip: tripApi, expense } = useApi();
   const { tripId } = useParams<{ tripId: string }>();
 
-  const [activeTab, setActiveTab] = useState("expenses");
+  const [activeTab, setActiveTab] = useState(
+    myExpenses ? "myExpenses" : "expenses"
+  );
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -262,12 +269,15 @@ const TripDetail = () => {
 
   // Show skeleton while loading
   if (
-    queryTripDetail?.isPending ||
-    queryExpenses?.isPending ||
+    queryTripDetail?.isLoading ||
+    queryExpenses?.isLoading ||
     queryExpenses?.isFetching ||
     queryExpenses?.isRefetching ||
     queryTripDetail?.isFetching ||
-    queryTripDetail?.isRefetching
+    queryTripDetail?.isRefetching ||
+    queryMyExpenses?.isLoading ||
+    queryMyExpenses?.isFetching ||
+    queryMyExpenses?.isRefetching
   ) {
     return <LoadingSkeleton />;
   }

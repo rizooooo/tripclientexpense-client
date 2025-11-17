@@ -108,6 +108,19 @@ const Balances = () => {
               }`}
             ></div>
           </button>
+          <button
+            onClick={() =>
+              history.push({
+                pathname: `/trips/${tripId}`,
+                state: {
+                  myExpenses: true,
+                },
+              })
+            }
+            className={`py-3 font-medium text-sm relative ${"text-gray-500"}`}
+          >
+            My Expenses
+          </button>
         </div>
 
         {/* Member Balances */}
