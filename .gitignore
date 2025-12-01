@@ -23,7 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-api/apis/*
-api/.openapi-generator/*
+api
 
 .env
