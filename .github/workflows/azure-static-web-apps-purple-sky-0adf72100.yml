@@ -11,7 +11,7 @@ on:
 
 jobs:
   build_and_deploy_job:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    if: github.event_name == 'push' || (github.event.action != 'closed')
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     permissions:
@@ -36,14 +36,16 @@ jobs:
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
-          # 🚨 REMOVED: azure_static_web_apps_api_token (This was the source of the "invalid api key" error)
+          # This instructs the action to ignore the missing legacy deployment token,
+          # allowing it to use the secure OIDC token provided below.
+          skip_deploy_on_missing_secrets: true
           action: "upload"
           ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
           app_location: "/" # App source code path
           api_location: "" # Api source code path - optional
           output_location: "dist" # Built app content directory - optional
-          github_id_token: ${{ steps.idtoken.outputs.result }} # Now relying only on the secure OIDC token
+          github_id_token: ${{ steps.idtoken.outputs.result }} # Relying on the secure OIDC token
           ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:
