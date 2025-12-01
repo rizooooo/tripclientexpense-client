@@ -13,7 +13,8 @@
     "deploy": "npm run build && swa deploy",
     "preview": "vite preview",
     "update:api": "rm -rf api && npm run generate:client",
-    "generate:client": "openapi-generator-cli generate -i http://localhost:5092/swagger/v1/swagger.json -g typescript-fetch -o api"
+    "generate:client": "openapi-generator-cli generate -i http://localhost:5092/swagger/v1/swagger.json -g typescript-fetch -o api",
+    "generate-live:client": "openapi-generator-cli generate -i https://tripexpenseapi-ehhbc7cedafnbsdr.eastasia-01.azurewebsites.net/swagger/v1/swagger.json -g typescript-fetch -o api --skip-validate-spec"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -17,25 +17,44 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      SWAGGER_URL: https://tripexpenseapi-ehhbc7cedafnbsdr.eastasia-01.azurewebsites.net/swagger/v1/swagger.json
     steps:
+      # Checkout code
       - uses: actions/checkout@v3
         with:
           submodules: true
           lfs: false
-      - name: Install OIDC Client from Core Package
-        run: npm install @actions/core@1.6.0 @actions/http-client
+
+      # Setup Node.js
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      # Install dependencies
+      - run: npm install
+
+      # Install OpenAPI Generator globally
+      - run: npm install @openapitools/openapi-generator-cli -g
+
+      # Generate API client from live Swagger (no JWT required)
+      - name: Generate API client from live Swagger
+        run: |
+          openapi-generator-cli generate \
+            -i $SWAGGER_URL \
+            -g typescript-fetch \
+            -o api \
+            --skip-validate-spec
+      # Deploy to Azure Static Web Apps
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_JOLLY_GLACIER_054B5D21E }}
           action: "upload"
-          ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
-          # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
-          app_location: "/" # App source code path
-          output_location: "dist" # Built app content directory - optional
+          app_location: "/" 
+          output_location: "dist"
           github_id_token: ${{ steps.idtoken.outputs.result }}
-          ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
