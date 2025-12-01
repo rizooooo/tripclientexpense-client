@@ -18,7 +18,7 @@ jobs:
       id-token: write
       contents: read
     env:
-      SWAGGER_URL: https://tripexpenseapi-ehhbc7cedafnbsdr.eastasia-01.azurewebsites.net/swagger/v1/swagger.json
+      SWAGGER_URL: https://tripexpenseapi-ehhbc7cedafnbsdr.eastasia-01.azurewebsites.net/swagger/v1/swagger.json?password=${{ secrets.SWAGGER_PASSWORD }}
     steps:
       # Checkout code
       - uses: actions/checkout@v3
@@ -52,7 +52,7 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_JOLLY_GLACIER_054B5D21E }}
           action: "upload"
-          app_location: "/" 
+          app_location: "/"
           output_location: "dist"
           github_id_token: ${{ steps.idtoken.outputs.result }}
 
