@@ -1,6 +1,9 @@
 {
   "name": "trip-expenses-client",
   "private": true,
+  "engines": {
+    "node": "22.15.0"
+  },
   "version": "0.0.0",
   "type": "module",
   "scripts": {
